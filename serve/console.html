@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>loopthink · router</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ffffff;--panel:#fafafa;--ink:#0a0a0a;--ink2:#404040;--mut:#737373;--faint:#a3a3a3;--line:#e5e5e5;--line2:#f0f0f0;
+  --fast:#059669;--fastbg:#ecfdf5;--llm:#4f46e5;--llmbg:#eef2ff;--oos:#b45309;--oosbg:#fffbeb;--bad:#dc2626;--badbg:#fef2f2;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+button{font-family:inherit}a{color:inherit}
+.nav{height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;letter-spacing:-.01em}
+.mark{width:24px;height:24px;border-radius:7px;background:var(--ink);display:grid;place-items:center}
+.mark svg{display:block}
+.logo span{font-weight:400;color:var(--mut);font-size:13.5px;margin-left:2px}
+.nav-r{display:flex;align-items:center;gap:18px;font-size:13.5px;color:var(--mut)}
+.nav-r a{text-decoration:none;font-weight:500}.nav-r a:hover{color:var(--ink)}
+.status{display:flex;align-items:center;gap:7px}.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.dot.on{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.16)}
+.btn-gh{border:1px solid var(--line);border-radius:8px;padding:7px 12px;color:var(--ink)!important}.btn-gh:hover{background:var(--panel)}
+html,body{overflow-x:hidden}.wrap>*{min-width:0}
+@media (max-width:640px){.run kbd{display:none}.run{padding:0 18px}.inputrow input{font-size:16px;padding:0 14px}}
+.wrap{max-width:1280px;margin:0 auto;padding:28px;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:980px){.wrap{grid-template-columns:1fr;padding:18px}.nav{padding:0 18px}.hide-s{display:none}}
+.card{border:1px solid var(--line);border-radius:16px;background:#fff}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+
+/* ask */
+.ask{padding:22px}
+.inputrow{display:flex;gap:10px;margin-top:12px}
+.inputrow input{flex:1;min-width:0;height:54px;border:1.5px solid var(--line);border-radius:12px;padding:0 18px;font:500 17px var(--sans);color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
+.inputrow input::placeholder{color:var(--faint);font-weight:400}
+.inputrow input:focus{border-color:var(--ink);box-shadow:0 0 0 4px rgba(10,10,10,.06)}
+.run{height:54px;padding:0 24px;border:0;border-radius:12px;background:var(--ink);color:#fff;font-weight:600;font-size:15.5px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:transform .08s,opacity .15s}
+.run:hover{opacity:.88}.run:active{transform:scale(.98)}.run:disabled{opacity:.5;cursor:default}
+.run kbd{font:500 11px var(--mono);background:rgba(255,255,255,.16);border-radius:5px;padding:2px 6px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;font-size:13.5px;color:var(--ink2);cursor:pointer;transition:all .12s}
+.chip:hover{border-color:var(--ink);color:var(--ink)}
+.chip.odd{border-style:dashed}
+
+/* pipeline */
+.pipe{margin-top:16px;padding:22px 22px 20px}
+.track{display:grid;grid-template-columns:auto 1fr auto 1fr auto 1fr auto;align-items:center;margin-top:20px}
+.st{display:flex;flex-direction:column;align-items:center;gap:8px;width:108px;text-align:center}
+.node{width:46px;height:46px;border-radius:14px;border:1.5px solid var(--line);display:grid;place-items:center;background:#fff;color:var(--faint);transition:all .25s}
+.st b{font-size:13px;font-weight:600;color:var(--faint);transition:color .25s}.st small{font:400 11.5px var(--mono);color:var(--faint);min-height:15px}
+.st.on .node{border-color:var(--ink);background:var(--ink);color:#fff}.st.on b{color:var(--ink)}.st.on small{color:var(--mut)}
+.st.llm.on .node{background:var(--llm);border-color:var(--llm)}
+.st.skip .node{border-style:dashed}.st.skip b{color:var(--faint);text-decoration:line-through}
+.st.warn .node{border-color:var(--oos);color:var(--oos);background:var(--oosbg)}.st.warn b{color:var(--oos)}
+.st.fail .node{border-color:var(--bad);color:var(--bad);background:var(--badbg)}.st.fail b{color:var(--bad)}
+.st.end.fast .node{background:var(--fast);border-color:var(--fast)}
+.st.end.oos .node{background:var(--oos);border-color:var(--oos)}
+.seg{height:2px;background:var(--line);position:relative;margin-bottom:46px;border-radius:2px;overflow:hidden}
+.seg i{position:absolute;inset:0;width:0;background:var(--ink);transition:width .28s ease-out}
+.seg.on i{width:100%}.seg.dash{background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 11px)}
+.seg.dash i{background:transparent}
+@media (max-width:640px){.st{width:70px}.st b{font-size:11.5px}.node{width:38px;height:38px;border-radius:11px}.seg{margin-bottom:42px}}
+
+/* result */
+.result{margin-top:16px;padding:24px;min-height:232px}
+.empty{color:var(--mut);font-size:14.5px;line-height:1.6;display:grid;place-items:center;text-align:center;min-height:182px}
+.empty b{color:var(--ink);font-weight:600}
+.rhead{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px}
+.badge.fast{color:var(--fast);background:var(--fastbg)}.badge.llm{color:var(--llm);background:var(--llmbg)}
+.badge.oos{color:var(--oos);background:var(--oosbg)}.badge.bad{color:var(--bad);background:var(--badbg)}
+.answer{font-size:34px;font-weight:700;letter-spacing:-.025em;line-height:1.12;margin:12px 0 8px}
+.code{font:400 12.5px var(--mono);color:var(--mut)}
+.why{font-size:14.5px;color:var(--ink2);line-height:1.55;margin:12px 0 0;max-width:560px}
+.lat{text-align:right;white-space:nowrap}.lat b{display:block;font-size:34px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.lat span{font-size:12.5px;color:var(--mut)}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line2)}
+@media (max-width:640px){.rgrid{grid-template-columns:1fr}.answer{font-size:26px}.lat b{font-size:26px}}
+.meter{position:relative;height:8px;border-radius:99px;background:var(--line2);margin:14px 0 9px}
+.meter i{display:block;height:100%;border-radius:99px;transition:width .4s ease-out}
+.meter .t{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink);border-radius:2px}
+.mscale{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut)}.mscale b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+.g{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;font-size:13.5px;margin-top:10px}
+.g .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}.g .p{color:var(--mut);font-variant-numeric:tabular-nums}
+.g .b{grid-column:1/-1;height:4px;border-radius:99px;background:var(--line2);margin-bottom:5px}.g .b i{display:block;height:100%;border-radius:99px;background:#d4d4d4;transition:width .4s ease-out}
+.g .pick{color:var(--ink);font-weight:600}.g .b.pick i{background:var(--ink)}
+details{border-top:1px solid var(--line2);margin-top:18px;padding-top:12px}
+details+details{margin-top:12px}
+summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink2);list-style:none;display:flex;align-items:center;gap:6px}
+summary::-webkit-details-marker{display:none}summary::before{content:"›";font-size:16px;color:var(--mut);transition:transform .15s;display:inline-block}
+details[open] summary::before{transform:rotate(90deg)}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;font:400 12px/1.6 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto;margin:8px 0 0;color:var(--ink2)}
+.plab{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-top:12px}
+
+/* tuning */
+.tune{margin-top:16px;padding:18px 22px}
+.tune-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:12px}
+.tune input[type=range]{flex:1;min-width:160px;accent-color:var(--ink)}
+.tval{font:500 14px var(--mono);min-width:48px;text-align:right}
+.seg-btns{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg-btns button{border:0;background:#fff;padding:7px 11px;font-size:12.5px;color:var(--mut);cursor:pointer;border-left:1px solid var(--line)}
+.seg-btns button:first-child{border-left:0}.seg-btns button.on{background:var(--ink);color:#fff}
+.hint{font-size:12.5px;color:var(--mut);margin-top:10px;line-height:1.5}
+
+/* impact */
+.impact{padding:22px;position:sticky;top:20px}
+.ihead{display:flex;justify-content:space-between;align-items:center}
+.link{border:0;background:none;color:var(--mut);font-size:12.5px;cursor:pointer;padding:0;font-weight:500}.link:hover{color:var(--ink)}
+.big{margin-top:16px}.big b{font-size:52px;font-weight:700;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.big span{display:block;font-size:14px;color:var(--ink2);margin-top:8px;line-height:1.45}
+.split{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line2);margin-top:16px;gap:2px}
+.split i{display:block;height:100%;transition:flex-grow .4s ease-out;flex:0 0 0}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:9px}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:var(--c)}
+.cmp{margin-top:22px;padding-top:18px;border-top:1px solid var(--line2)}
+.cmp-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);font-weight:600}
+.delta{font-size:12px;font-weight:600;color:var(--fast);background:var(--fastbg);padding:3px 8px;border-radius:99px}
+.delta.neg{color:var(--oos);background:var(--oosbg)}
+.bar{display:grid;grid-template-columns:128px 1fr 70px;gap:10px;align-items:center;font-size:12.5px;color:var(--mut);margin-top:9px}
+.bar div{height:10px;border-radius:99px;background:var(--line2);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;transition:width .45s ease-out;width:0}
+.bar b{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+.bar.us i{background:var(--ink)}.bar.them i{background:#d4d4d4}
+.note{font-size:11.5px;color:var(--faint);line-height:1.5;margin-top:14px}
+.play{width:100%;margin-top:18px;height:44px;border:1px solid var(--line);background:#fff;border-radius:11px;font-weight:600;font-size:14px;cursor:pointer;color:var(--ink);transition:all .12s}
+.play:hover{border-color:var(--ink)}.play:disabled{opacity:.55;cursor:default}
+.log{margin-top:20px;padding-top:16px;border-top:1px solid var(--line2)}
+.rows{margin-top:8px;max-height:262px;overflow:auto}
+.row{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line2);font-size:13px;cursor:pointer}
+.row:last-child{border-bottom:0}.row i{width:8px;height:8px;border-radius:50%}
+.row .q{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}.row .q small{display:block;font:400 11.5px var(--mono);color:var(--mut);overflow:hidden;text-overflow:ellipsis}
+.row .ms{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12.5px}
+.none{font-size:13px;color:var(--faint);padding:14px 0 4px}
+.foot{max-width:1280px;margin:0 auto;padding:0 28px 36px;font-size:12.5px;color:var(--mut);display:flex;gap:8px 22px;flex-wrap:wrap}
+.foot b{color:var(--ink);font-weight:600}.foot a{color:var(--ink);font-weight:500}
+.fade{animation:fade .3s ease-out}@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="logo"><div class="mark"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h4m0 0l3-4h3M6 7l3 4h3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>loopthink<span class="hide-s">Small model first. LLM only when needed.</span></div>
+  <div class="nav-r">
+    <div class="status hide-s"><i class="dot" id="d-llm"></i><span id="s-llm">Connecting…</span></div>
+    <a class="hide-s" href="https://github.com/preranam05/loopthink/blob/main/results/REPORT.md" target="_blank" rel="noopener">Benchmarks</a>
+    <a class="btn-gh" href="https://github.com/preranam05/loopthink" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div>
+    <div class="card ask">
+      <div class="eyebrow">Send a request to the assistant</div>
+      <form class="inputrow" id="form">
+        <input id="q" autocomplete="off" maxlength="300" placeholder="Ask for anything, e.g. remind me to call the dentist tomorrow">
+        <button class="run" id="run">Run <kbd>↵</kbd></button>
+      </form>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="card pipe">
+      <div class="eyebrow">Route taken</div>
+      <div class="track">
+        <div class="st" id="st0"><div class="node"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><b>Request</b><small></small></div>
+        <div class="seg" id="sg0"><i></i></div>
+        <div class="st" id="st1"><div class="node"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><b>Small model</b><small>22.8M params</small></div>
+        <div class="seg" id="sg1"><i></i></div>
+        <div class="st llm" id="st2"><div class="node"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg></div><b>LLM</b><small>only if unsure</small></div>
+        <div class="seg" id="sg2"><i></i></div>
+        <div class="st end" id="st3"><div class="node"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></div><b>Answer</b><small></small></div>
+      </div>
+    </div>
+
+    <div class="card result" id="result"><div class="empty"><div>Type a request above or pick an example.<br>You will see <b>which model answered</b>, <b>how long it took</b> and <b>why</b>.</div></div></div>
+
+    <div class="card tune">
+      <div class="eyebrow">How cautious should the small model be?</div>
+      <div class="tune-row">
+        <input type="range" id="thr" min="0.5" max="0.999" step="0.001">
+        <span class="tval" id="thrv"></span>
+        <div class="seg-btns" id="presets"></div>
+      </div>
+      <div class="hint" id="thrhint">Requests where the small model's confidence is at or below this level go to the LLM. Higher means more accurate and more expensive.</div>
+    </div>
+  </div>
+
+  <div class="card impact">
+    <div class="ihead"><div class="eyebrow">This session</div><div><button class="link" id="csv">Export CSV</button> &nbsp;·&nbsp; <button class="link" id="reset">Reset</button></div></div>
+    <div class="big"><b id="pct">–</b><span id="pcts">of requests answered without calling an LLM</span></div>
+    <div class="split"><i id="sp0" style="background:var(--fast)"></i><i id="sp1" style="background:var(--llm)"></i><i id="sp2" style="background:var(--oos)"></i></div>
+    <div class="legend"><span style="--c:var(--fast)" id="lg0">Small model 0</span><span style="--c:var(--llm)" id="lg1">LLM 0</span><span style="--c:var(--oos)" id="lg2">Out of scope 0</span></div>
+
+    <div class="cmp">
+      <div class="cmp-h"><span>Average response time</span><span class="delta" id="dt" hidden></span></div>
+      <div class="bar us"><span>With the router</span><div><i id="b-t1"></i></div><b id="v-t1">–</b></div>
+      <div class="bar them"><span>LLM for everything</span><div><i id="b-t2"></i></div><b id="v-t2">–</b></div>
+    </div>
+    <div class="cmp" style="border-top:0;padding-top:0;margin-top:18px">
+      <div class="cmp-h"><span>Cost per 1,000 requests</span><span class="delta" id="dc" hidden></span></div>
+      <div class="bar us"><span>With the router</span><div><i id="b-c1"></i></div><b id="v-c1">–</b></div>
+      <div class="bar them"><span>LLM for everything</span><div><i id="b-c2"></i></div><b id="v-c2">–</b></div>
+    </div>
+    <div class="note" id="note">Estimates. "LLM for everything" and cost figures use the per-call latency and token usage measured on the CLINC150 benchmark with a 7B model, priced at $0.15 / $0.60 per million input / output tokens.</div>
+
+    <button class="play" id="play">▶&nbsp; Play 20 sample requests</button>
+
+    <div class="log">
+      <div class="eyebrow">Recent requests</div>
+      <div class="rows" id="rows"><div class="none">Nothing yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pretty = l => { const s = l.replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const EXAMPLES = [["set a timer for ten minutes"], ["is my flight to denver on time"], ["remind me to call the dentist tomorrow"],
+  ["play some jazz in the kitchen"], ["what should i cook with eggs and spinach"], ["who painted the sistine chapel", 1], ["how do i grow tomatoes on a balcony", 1]];
+const SAMPLE = ["set a timer for ten minutes", "what's the weather like in boston", "wake me up at 6am", "book me a flight to chicago on friday",
+  "play some jazz", "how many calories are in an apple", "who painted the sistine chapel", "remind me to call the dentist tomorrow",
+  "what time is it in tokyo", "add milk to my shopping list", "is my flight to denver on time", "translate good morning into french",
+  "how do you say thank you in spanish", "what's on my calendar tomorrow", "tell me a joke", "how long does it take to boil an egg",
+  "what should i cook with eggs and spinach", "turn the volume up", "flip a coin", "what's the capital of australia"];
+let CFG = null, hist = [], busy = false, last = null;
+
+function kindOf(r) {
+  if (r.source === 'model') return 'fast';
+  if (r.source === 'llm') return r.answer === 'out_of_scope' ? 'oos' : 'llm';
+  if (r.source === 'model_fallback') return 'bad';
+  return 'pending';                                   // escalated, but no LLM answered it
+}
+const COLORS = {fast: 'var(--fast)', llm: 'var(--llm)', oos: 'var(--oos)', bad: 'var(--bad)', pending: 'var(--llm)'};
+
+function resetPipe() {
+  for (let i = 0; i < 4; i++) { $('st' + i).className = 'st' + (i === 2 ? ' llm' : i === 3 ? ' end' : ''); }
+  for (let i = 0; i < 3; i++) { $('sg' + i).className = 'seg'; }
+  $('st0').querySelector('small').textContent = ''; $('st3').querySelector('small').textContent = '';
+  $('st1').querySelector('small').textContent = '22.8M params'; $('st2').querySelector('small').textContent = 'only if unsure';
+}
+async function animate(r, quick) {
+  const k = kindOf(r), d = quick ? 60 : 190;
+  resetPipe();
+  $('st0').classList.add('on'); await sleep(d);
+  $('sg0').classList.add('on'); await sleep(d);
+  $('st1').classList.add('on'); $('st1').querySelector('small').textContent = Math.max(1, Math.round(r.model_ms)) + ' ms'; await sleep(d);
+  if (k === 'fast') {
+    $('st2').classList.add('skip'); $('st2').querySelector('small').textContent = 'skipped';
+    $('sg1').classList.add('on'); $('sg2').classList.add('on'); await sleep(d);
+    $('st3').classList.add('on', 'fast');
+  } else {
+    $('sg1').classList.add('on'); await sleep(d);
+    const st = $('st2').querySelector('small');
+    if (k === 'pending') { $('st2').classList.add('warn'); st.textContent = CFG.llm_connected ? 'switched off' : 'not connected'; $('sg2').classList.add('dash'); return; }
+    if (k === 'bad') { $('st2').classList.add('fail'); st.textContent = 'failed'; }
+    else { $('st2').classList.add('on'); st.textContent = Math.round(r.llm_ms || 0) + ' ms'; }
+    await sleep(d); $('sg2').classList.add('on'); await sleep(d);
+    $('st3').classList.add('on'); if (k === 'oos') $('st3').classList.add('oos');
+    $('st3').querySelector('b').textContent = k === 'oos' ? 'Declined' : 'Answer';
+  }
+  if (k !== 'oos') $('st3').querySelector('b').textContent = 'Answer';
+}
+
+function showResult(r, thr) {
+  const k = kindOf(r), guess = r.top[0].intent, conf = r.confidence;
+  const T = {
+    fast: ['fast', 'Answered instantly by the small model', pretty(r.answer),
+      `The small model was <b>${(100 * conf).toFixed(0)}% confident</b>, so it answered on its own. No LLM call, no LLM cost.`],
+    llm: ['llm', 'Escalated to the LLM', pretty(r.answer),
+      `The small model was only ${(100 * conf).toFixed(0)}% confident, so it asked the LLM to choose from its shortlist. ` +
+      (r.answer === guess ? 'The LLM <b>confirmed its first guess</b>.' : `The LLM <b>corrected it</b> (first guess was ${esc(pretty(guess))}).`)],
+    oos: ['oos', 'Escalated to the LLM · declined', 'Not a supported request',
+      `The small model was only ${(100 * conf).toFixed(0)}% confident. The LLM checked the shortlist and <b>declined</b> instead of forcing a wrong answer.`],
+    bad: ['bad', 'LLM unavailable · safe fallback', pretty(r.answer),
+      `The request was escalated, but the LLM call failed. The service returned the small model's best guess <b>instead of an error</b>.`],
+    pending: ['llm', 'Would be escalated to the LLM', pretty(r.answer),
+      `The small model is only ${(100 * conf).toFixed(0)}% confident, so this request would go to the LLM. ` +
+      (CFG.llm_connected ? 'LLM fallback is switched off for this request.' : 'No LLM is connected to this deployment, so its best guess is shown.')]
+  }[k];
+  const guesses = r.top.slice(0, 4).map(t => { const pick = t.intent === r.answer ? ' pick' : '';
+    return `<span class="n${pick}">${esc(pretty(t.intent))}</span><span class="p">${(100 * t.prob).toFixed(1)}%</span><div class="b${pick}"><i style="width:${Math.max(1, 100 * t.prob)}%"></i></div>`; }).join('');
+  let extra = '';
+  if (r.llm_prompt) extra += `<details><summary>Prompt ${k === 'pending' ? 'that would be' : ''} sent to the LLM</summary><div class="plab">System</div><pre>${esc(r.llm_prompt.system)}</pre><div class="plab">User</div><pre>${esc(r.llm_prompt.user)}</pre></details>`;
+  const pub = Object.fromEntries(Object.entries(r).filter(([key]) => key !== 'llm_prompt'));
+  extra += `<details><summary>API response</summary><pre>POST /decide\n${esc(JSON.stringify(pub, null, 2))}</pre></details>`;
+  $('result').innerHTML = `<div class="fade"><div class="rhead"><div><span class="badge ${T[0]}">${T[1]}</span>
+    <div class="answer">${esc(T[2])}</div>${k === 'oos' ? '' : `<span class="code">${esc(r.answer)}</span>`}<p class="why">${T[3]}</p></div>
+    <div class="lat"><b>${Math.max(1, Math.round(r.latency_ms))}<span style="font-size:16px;font-weight:600;color:var(--mut);display:inline"> ms</span></b><span>total response time</span></div></div>
+    <div class="rgrid"><div><div class="eyebrow">Small model confidence</div>
+      <div class="meter"><i style="width:${Math.max(2, 100 * conf)}%;background:${conf > thr ? 'var(--fast)' : 'var(--llm)'}"></i><div class="t" style="left:${100 * thr}%"></div></div>
+      <div class="mscale"><span>confidence <b>${conf.toFixed(3)}</b></span><span>escalates at <b>${thr.toFixed(3)}</b></span></div></div>
+      <div><div class="eyebrow">Its top guesses</div><div class="g">${guesses}</div></div></div>${extra}</div>`;
+}
+
+function estimate() {
+  const R = CFG.reference, n = hist.length;
+  const direct = hist.filter(h => !h.escalate), esc_ = hist.filter(h => h.escalate);
+  const answered = CFG.llm_connected && esc_.every(h => h.kind !== 'pending');      // real LLM timings available
+  const t1 = (direct.reduce((a, h) => a + h.latency_ms, 0) + esc_.reduce((a, h) => a + (answered ? h.latency_ms : R.escalated_ms), 0)) / n;
+  const c1 = esc_.length * R.escalated_cost_per_1k / n;
+  return {t1, t2: R.llm_only_ms, c1, c2: R.llm_only_cost_per_1k};
+}
+function money(x) { return '$' + (x < 0.1 ? x.toFixed(3) : x.toFixed(2)); }
+function setDelta(el, ours, theirs) {
+  const d = 100 * (1 - ours / theirs); el.hidden = false;
+  el.textContent = d >= 0 ? `${d.toFixed(0)}% lower` : `${(-d).toFixed(0)}% higher`; el.className = 'delta' + (d >= 0 ? '' : ' neg');
+}
+function renderImpact() {
+  const n = hist.length, c = {fast: 0, llm: 0, oos: 0};
+  hist.forEach(h => { const k = h.kind === 'fast' ? 'fast' : h.kind === 'oos' ? 'oos' : 'llm'; c[k]++; });
+  ['fast', 'llm', 'oos'].forEach((k, i) => { $('sp' + i).style.flexGrow = c[k]; });
+  $('lg0').textContent = 'Small model ' + c.fast; $('lg1').textContent = 'LLM ' + c.llm; $('lg2').textContent = 'Out of scope ' + c.oos;
+  if (!n) {
+    $('pct').textContent = '–'; $('pcts').textContent = 'of requests answered without calling an LLM';
+    ['t1', 't2', 'c1', 'c2'].forEach(k => { $('b-' + k).style.width = '0'; $('v-' + k).textContent = '–'; });
+    $('dt').hidden = $('dc').hidden = true; $('rows').innerHTML = '<div class="none">Nothing yet.</div>'; return;
+  }
+  $('pct').textContent = Math.round(100 * c.fast / n) + '%';
+  $('pcts').textContent = `of requests answered without calling an LLM (${c.fast} of ${n})`;
+  const e = estimate(), tm = Math.max(e.t1, e.t2), cm = Math.max(e.c1, e.c2);
+  $('b-t1').style.width = Math.max(1.5, 100 * e.t1 / tm) + '%'; $('b-t2').style.width = 100 * e.t2 / tm + '%';
+  $('b-c1').style.width = Math.max(1.5, 100 * e.c1 / cm) + '%'; $('b-c2').style.width = 100 * e.c2 / cm + '%';
+  $('v-t1').textContent = Math.round(e.t1) + ' ms'; $('v-t2').textContent = e.t2 + ' ms';
+  $('v-c1').textContent = money(e.c1); $('v-c2').textContent = money(e.c2);
+  setDelta($('dt'), e.t1, e.t2); setDelta($('dc'), Math.max(e.c1, 1e-9), e.c2);
+  $('rows').innerHTML = hist.slice(0, 40).map((h, i) => `<div class="row" data-i="${i}"><i style="background:${COLORS[h.kind]}"></i>
+    <div class="q">${esc(h.text)}<small>${esc(h.kind === 'oos' ? 'declined: not supported' : h.answer)}${h.kind === 'pending' ? ' · needs LLM' : ''}</small></div>
+    <span class="ms">${Math.max(1, Math.round(h.latency_ms))} ms</span></div>`).join('');
+}
+
+async function decide(text, quick) {
+  const thr = parseFloat($('thr').value);
+  const res = await fetch('decide', {method: 'POST', headers: {'content-type': 'application/json'},
+    body: JSON.stringify({text, min_confidence: thr, explain: true})});
+  if (!res.ok) throw new Error('The service returned ' + res.status);
+  const r = await res.json();
+  last = {text, r, thr};
+  hist.unshift({text, answer: r.answer, source: r.source, escalate: r.escalate, confidence: r.confidence, latency_ms: r.latency_ms, kind: kindOf(r), r, thr});
+  const anim = animate(r, quick); showResult(r, thr); renderImpact(); await anim;
+}
+async function run(text) {
+  text = (text || '').trim(); if (!text || busy) return;
+  busy = true; $('run').disabled = true; $('q').value = text;
+  try { await decide(text, false); }
+  catch (e) { $('result').innerHTML = `<div class="empty"><div><b>Could not reach the router.</b><br>${esc(e.message)}</div></div>`; }
+  busy = false; $('run').disabled = false;
+}
+async function play() {
+  if (busy) return; busy = true; $('play').disabled = $('run').disabled = true;
+  try { for (let i = 0; i < SAMPLE.length; i++) { $('play').textContent = `Running ${i + 1} of ${SAMPLE.length}…`; $('q').value = SAMPLE[i]; await decide(SAMPLE[i], true); await sleep(140); } }
+  catch (e) { $('result').innerHTML = `<div class="empty"><div><b>Could not reach the router.</b><br>${esc(e.message)}</div></div>`; }
+  $('play').innerHTML = '▶&nbsp; Play 20 sample requests'; busy = false; $('play').disabled = $('run').disabled = false;
+}
+function setThr(v) {
+  $('thr').value = v; $('thrv').textContent = parseFloat(v).toFixed(3);
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', Math.abs(parseFloat(b.dataset.v) - v) < 0.0006));
+}
+function exportCsv() {
+  if (!hist.length) return;
+  const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const lines = ['request,decision,route,escalated,confidence,latency_ms'].concat(hist.slice().reverse().map(h =>
+    [q(h.text), h.answer, h.source, h.escalate ? 1 : 0, h.confidence, h.latency_ms].join(',')));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type: 'text/csv'}));
+  a.download = 'loopthink_session.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+async function init() {
+  $('chips').innerHTML = EXAMPLES.map(([t, odd]) => `<button type="button" class="chip${odd ? ' odd' : ''}">${esc(t)}</button>`).join('');
+  $('chips').onclick = e => { if (e.target.classList.contains('chip')) run(e.target.textContent); };
+  $('form').onsubmit = e => { e.preventDefault(); run($('q').value); };
+  $('play').onclick = play; $('csv').onclick = exportCsv;
+  $('reset').onclick = () => { if (busy) return; hist = []; renderImpact(); resetPipe(); };
+  $('rows').onclick = e => { const row = e.target.closest('.row'); if (!row || busy) return; const h = hist[+row.dataset.i]; $('q').value = h.text; showResult(h.r, h.thr); animate(h.r, true); };
+  $('thr').oninput = e => setThr(parseFloat(e.target.value));
+  $('thr').onchange = () => { if (last && !busy) run(last.text); };
+  try {
+    CFG = await (await fetch('config')).json();
+  } catch (e) { $('s-llm').textContent = 'Router offline'; return; }
+  $('d-llm').classList.toggle('on', true);
+  $('s-llm').textContent = CFG.llm_connected ? `Live · LLM fallback ${CFG.llm_model}` : 'Live · small model only';
+  const P = Object.entries(CFG.presets || {}).map(([k, v]) => [parseFloat(k), v]).sort((a, b) => a[0] - b[0]);
+  const names = {0.05: 'Cheaper', 0.1: 'Balanced', 0.2: 'Safer'};
+  $('presets').innerHTML = P.map(([k, v]) => `<button type="button" data-v="${v}" title="escalates about ${Math.round(100 * k)}% of known requests">${names[k] || Math.round(100 * k) + '%'}</button>`).join('');
+  $('presets').onclick = e => { if (e.target.dataset.v) { setThr(parseFloat(e.target.dataset.v)); if (last && !busy) run(last.text); } };
+  setThr(Math.min(0.999, Math.max(0.5, CFG.min_confidence)));
+  const R = CFG.reference;
+  $('foot').innerHTML = `<span>Benchmark (CLINC150, 5% unknown traffic): <b>${R.accuracy}%</b> accuracy with the router, <b>${R.llm_only_accuracy}%</b> for a 7B LLM alone</span>
+    <span>${CFG.intents} intents · ${esc(String(CFG.base_model || '').split('/').pop())}</span>
+    <a href="https://github.com/preranam05/loopthink/blob/main/results/REPORT.md" target="_blank" rel="noopener">Full measurements</a>`;
+  renderImpact(); $('q').focus();
+}
+init();
+</script>
+</body>
+</html>

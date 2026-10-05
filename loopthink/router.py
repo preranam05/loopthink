@@ -54,6 +54,7 @@ class Router:
     def __init__(self, predict_probs, intents, threshold, llm=None, top_k=5, meta=None):
         self.predict_probs, self.intents, self.threshold = predict_probs, intents, threshold
         self.llm, self.top_k, self.meta = llm, top_k, meta or {}
+        self.presets = {}
 
     @classmethod
     def from_dir(cls, run_dir, val_rate=0.10, llm=None, top_k=5, device="cpu"):
@@ -76,14 +77,18 @@ class Router:
             return softmax(head((h * m).sum(1) / m.sum(1).clamp(min=1)).float().cpu().numpy())
 
         thr = cfg["thresholds_by_val_rate"][str(val_rate)]
-        return cls(predict_probs, cfg["intents"], thr, llm, top_k,
-                   meta=dict(base_model=cfg["base_model"], setup=cfg["setup"], val_rate=val_rate, threshold=thr))
+        r = cls(predict_probs, cfg["intents"], thr, llm, top_k,
+                meta=dict(base_model=cfg["base_model"], setup=cfg["setup"], val_rate=val_rate, threshold=thr))
+        r.presets = {k: round(-float(v), 3) for k, v in cfg["thresholds_by_val_rate"].items()}   # rate -> min confidence
+        return r
 
-    def decide(self, text, allow_llm=True):
+    def decide(self, text, allow_llm=True, min_confidence=None, top_k=None):
+        """min_confidence: escalate at or below this max probability (default: the validated threshold)."""
         t0 = time.perf_counter()
         p = self.predict_probs([text])[0]
         model_ms = (time.perf_counter() - t0) * 1000
-        out = decide_from_probs(p, self.intents, self.threshold, text, self.llm, allow_llm, self.top_k)
+        thr = self.threshold if min_confidence is None else -float(min_confidence)
+        out = decide_from_probs(p, self.intents, thr, text, self.llm, allow_llm, top_k or self.top_k)
         out["model_ms"] = round(model_ms, 2)
         out["latency_ms"] = round((time.perf_counter() - t0) * 1000, 2)
         return out

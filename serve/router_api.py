@@ -3,9 +3,10 @@
   ROUTER_DIR=runs/minilm_official uvicorn serve.router_api:app --port 8000
   open http://localhost:8000/dashboard
 
-POST /decide     {"text": "...", "allow_llm": true}
-GET  /metrics    rolling metrics (?minutes=60)     GET /dashboard   live HTML view
-GET  /health     GET /intents
+GET  /           interactive console (serve/console.html)
+POST /decide     {"text": "...", "allow_llm": true, "min_confidence": 0.95, "top_k": 5, "explain": false}
+GET  /metrics    rolling metrics (?minutes=60)     GET /dashboard   operations view
+GET  /health     GET /intents     GET /config
 
 Env: LLM_PROVIDER (ollama|openai|groq|openrouter|gemini, key in OPENAI_API_KEY etc.), ROUTER_DIR, VAL_RATE (0.05|0.1|0.2, default 0.1), OLLAMA_HOST (http://localhost:11434),
      LLM_MODEL (qwen2.5:7b), LLM_TIMEOUT (10), TOP_K (5), LOG_PATH (logs/requests.jsonl), STORE_TEXT (1),
@@ -16,10 +17,10 @@ from __future__ import annotations
 import os
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from loopthink.llm import ExampleIndex, shortlist_llm
+from loopthink.llm import KEY_ENV, OOS, ExampleIndex, build_shortlist_prompt, shortlist_llm, shortlist_message
 from loopthink.router import RequestLog, Router
 
 CFG = dict(router_dir=os.environ.get("ROUTER_DIR", "runs/minilm_official"),
@@ -33,24 +34,38 @@ CFG = dict(router_dir=os.environ.get("ROUTER_DIR", "runs/minilm_official"),
            log_path=os.environ.get("LOG_PATH", "logs/requests.jsonl"),
            store_text=os.environ.get("STORE_TEXT", "1") == "1")
 
-app = FastAPI(title="loopthink router", version="0.2.0",
+app = FastAPI(title="loopthink router", version="0.3.0",
               description="A 22M classifier answers most queries in milliseconds; uncertain ones go to an LLM.")
 _router: Router | None = None
 _log: RequestLog | None = None
 
 
+_ex: ExampleIndex | None = None
+# Reference figures measured on CLINC150 with a local 7B LLM (results/REPORT.md), used by the console to
+# estimate what a session would have cost if every request had gone to the LLM.
+REFERENCE = dict(llm_only_ms=455, llm_only_cost_per_1k=0.099, escalated_ms=755, escalated_cost_per_1k=0.082,
+                 accuracy=95.2, llm_only_accuracy=78.7)
+
+
+def _llm_available() -> bool:
+    if not CFG["llm_model"]:
+        return False
+    if CFG["provider"] == "ollama":
+        return True
+    return bool(os.environ.get(KEY_ENV.get(CFG["provider"], "LLM_API_KEY")) or os.environ.get("LLM_API_KEY"))
+
+
 def router() -> Router:
-    global _router
+    global _router, _ex
     if _router is None:
-        ex = None
-        if CFG["llm_model"] and CFG["examples"] > 0:
+        if CFG["examples"] > 0:
             try:
-                ex = ExampleIndex.from_run(CFG["router_dir"])
+                _ex = ExampleIndex.from_run(CFG["router_dir"])
             except Exception as e:   # no training data next to the model: serve with label names only
                 print(f"examples prompt disabled ({type(e).__name__}: {e})")
-        CFG["examples_active"] = CFG["examples"] if ex else 0
+        CFG["examples_active"] = CFG["examples"] if _ex else 0
         llm = shortlist_llm(CFG["ollama"], CFG["llm_model"], CFG["llm_timeout"], CFG["provider"],
-                            examples=ex, n_examples=CFG["examples"]) if CFG["llm_model"] else None
+                            examples=_ex, n_examples=CFG["examples"]) if _llm_available() else None
         _router = Router.from_dir(CFG["router_dir"], CFG["val_rate"], llm, CFG["top_k"])
     return _router
 
@@ -65,19 +80,41 @@ def log() -> RequestLog:
 class DecideReq(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
     allow_llm: bool = Field(True, description="false = never call the LLM (latency/cost cap)")
+    min_confidence: float | None = Field(None, ge=0.0, le=1.0, description="escalate at or below this confidence; "
+                                         "default is the threshold validated offline")
+    top_k: int | None = Field(None, ge=2, le=10, description="shortlist size shown to the LLM")
+    explain: bool = Field(False, description="also return the prompt an escalated request sends to the LLM")
 
 
 @app.post("/decide")
 def decide(req: DecideReq):
-    out = router().decide(req.text, req.allow_llm)
+    r = router()
+    out = r.decide(req.text, req.allow_llm, req.min_confidence, req.top_k)
     log().add(req.text, out)
+    if req.explain and out["escalate"]:
+        cands = [t["intent"] for t in out["top"]] + [OOS]
+        ex = _ex.lookup(req.text, cands, CFG["examples"]) if _ex is not None and CFG["examples"] > 0 else None
+        out = dict(out, llm_prompt=dict(system=build_shortlist_prompt(bool(ex)), user=shortlist_message(req.text, cands, ex)))
     return out
+
+
+@app.get("/config")
+def config():
+    r = router()
+    return dict(intents=len(r.intents), base_model=r.meta.get("base_model"), llm_connected=r.llm is not None,
+                llm_model=CFG["llm_model"] if r.llm is not None else None, min_confidence=round(-r.threshold, 3),
+                presets=r.presets, top_k=r.top_k, examples_per_label=CFG.get("examples_active", 0), reference=REFERENCE)
+
+
+@app.get("/", include_in_schema=False)
+def console():
+    return FileResponse(os.path.join(os.path.dirname(os.path.abspath(__file__)), "console.html"), media_type="text/html")
 
 
 @app.get("/health")
 def health():
     r = router()
-    return dict(status="ok", intents=len(r.intents), llm_model=CFG["llm_model"], llm_provider=CFG["provider"],
+    return dict(status="ok", intents=len(r.intents), llm_model=CFG["llm_model"] if r.llm is not None else None, llm_provider=CFG["provider"],
                 examples_per_label=CFG.get("examples_active", 0), **r.meta)
 
 
@@ -125,7 +162,7 @@ button{padding:8px 14px;border:0;border-radius:8px;background:var(--acc);color:#
 const pct=x=>x==null?'–':(100*x).toFixed(1)+'%';
 function rows(el,pairs){el.innerHTML=pairs.map(([a,b])=>`<tr><td>${a}</td><td style="text-align:right">${b}</td></tr>`).join('')}
 async function load(){try{
- const h=await (await fetch('health')).json();document.getElementById('sub').textContent=`${h.base_model} · ${h.intents} intents · escalate below ${(-h.threshold).toFixed(2)} confidence · fallback ${h.llm_model}`;
+ const h=await (await fetch('health')).json();document.getElementById('sub').textContent=`${h.base_model} · ${h.intents} intents · escalate below ${(-h.threshold).toFixed(2)} confidence · fallback ${h.llm_model||'not connected'}`;
  const m=await (await fetch('metrics')).json();document.getElementById('n').textContent=m.requests??0;
  if(!m.requests)return;document.getElementById('esc').textContent=pct(m.escalation_rate);document.getElementById('oos').textContent=pct(m.out_of_scope_rate);
  document.getElementById('lat').textContent=`${m.latency_ms.p50} / ${m.latency_ms.p95} ms`;document.getElementById('fail').textContent=pct(m.llm_failure_rate);

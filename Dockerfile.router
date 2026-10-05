@@ -2,12 +2,13 @@
 #   python scripts/encoder_baseline.py --setup official --out runs/minilm_clinc_official_s0 --save_model
 #   docker build -f Dockerfile.router -t loopthink-router .
 #   docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 loopthink-router
+#   open http://localhost:8000
 FROM python:3.11-slim
 WORKDIR /app
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir transformers numpy scikit-learn certifi fastapi "uvicorn[standard]" pydantic
 COPY loopthink/__init__.py loopthink/llm.py loopthink/router.py loopthink/
-COPY serve/router_api.py serve/
+COPY serve/router_api.py serve/console.html serve/
 COPY runs/minilm_clinc_official_s0/router.json runs/minilm_clinc_official_s0/head.pt runs/minilm_clinc_official_s0/examples.json model/
 COPY runs/minilm_clinc_official_s0/encoder/ model/encoder/
 ENV ROUTER_DIR=/app/model VAL_RATE=0.1 LLM_MODEL=qwen2.5:7b EXAMPLES=3 LOG_PATH=/app/logs/requests.jsonl

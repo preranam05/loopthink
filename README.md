@@ -108,7 +108,7 @@ Code: `loopthink/model.py`, `pretrain.py`, `finetune.py`, `evaluate.py`; `script
 ```bash
 python scripts/encoder_baseline.py --setup official --out runs/minilm_clinc_official_s0 --save_model
 ROUTER_DIR=runs/minilm_clinc_official_s0 uvicorn serve.router_api:app --port 8000
-# open http://localhost:8000/dashboard
+# open http://localhost:8000            (console; operations view at /dashboard)
 ```
 
 `POST /decide {"text": "..."}` returns the answer, confidence, the top-5 intents, whether it escalated, a
@@ -127,8 +127,10 @@ the best setup measured above (`EXAMPLES=0` sends label names only). A test chec
 is the same one the offline measurement used. The fallback LLM is Ollama by default; `LLM_PROVIDER=openai|groq|openrouter|gemini` switches to a
 hosted model. `Dockerfile.router` builds a container.
 
-`demo/router_app.py` is a small Gradio front end for the same router, and `scripts/push_space.py` publishes
-it as a Hugging Face Space.
+The root URL (`/`) is an interactive console: type a request and see which model answered, the route it took,
+the timings and the prompt an escalated request sends. A session panel estimates time and cost against sending
+every request to an LLM, and a slider changes the confidence threshold per request. `scripts/push_space.py`
+publishes the same service as a Hugging Face Space.
 
 ## Reproduce
 
@@ -157,8 +159,8 @@ The looped model needs the 200M-token pretraining run first (about 10 hours on t
 ```
 loopthink/   router.py  llm.py                      decision logic, LLM fallback
              model.py  pretrain.py  finetune.py  evaluate.py  engine.py   looped transformer
-serve/       router_api.py  (api.py: looped-model service)
-demo/        router_app.py  (app.py: looped-model demo)
+serve/       router_api.py  console.html  (api.py: looped-model service)
+demo/        app.py  (looped-model demo)
 scripts/     encoder_baseline.py  cascade.py  llm_validate.py  report.py
              conformal.py  clm.py  kill_test.py  prepare_hwu64.py  run_seeds.sh
 results/     REPORT.md  CONFORMAL.md  CLM_KILLTEST.md

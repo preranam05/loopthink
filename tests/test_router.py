@@ -166,15 +166,41 @@ def test_rate_limit_raises_instead_of_hanging(monkeypatch):
     assert out["source"] == "model_fallback" and out["answer"] == "timer"
 
 
-def test_demo_renders_every_route():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("router_app", os.path.join(os.path.dirname(__file__), "..", "demo", "router_app.py"))
-    app = importlib.util.module_from_spec(spec); spec.loader.exec_module(app)
-    def fail(t, c): raise TimeoutError("down")
-    cases = [(0.95, None, "small classifier"), (0.3, lambda t, c: dict(label="alarm", ms=9.0), "Answered by the LLM"),
-             (0.3, lambda t, c: dict(label=OOS, ms=9.0), "Not something this assistant handles"),
-             (0.3, fail, "LLM call failed"), (0.3, None, "Would be sent to the LLM")]
-    for conf, llm, expect in cases:
-        out = decide_from_probs(probs("timer", conf), INTENTS, THR, "x", llm); out["model_ms"] = 2.0
-        md = app.render(out)
-        assert expect in md and "| `timer` |" in md
+def _client(tmp_path, monkeypatch, llm):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    import serve.router_api as api
+    r = Router(lambda texts: np.stack([probs("reminder", 0.9 if "remind" in t else 0.7 if "maybe" in t else 0.2) for t in texts]),
+               INTENTS, THR, llm=llm, meta=dict(base_model="stub", threshold=THR))
+    r.presets = {"0.1": 0.6}
+    monkeypatch.setattr(api, "_router", r)
+    monkeypatch.setattr(api, "_ex", ExampleIndex.from_labeled(TRAIN))
+    monkeypatch.setitem(api.CFG, "examples", 2)
+    monkeypatch.setattr(api, "_log", RequestLog(str(tmp_path / "log.jsonl")))
+    return TestClient(api.app)
+
+
+def test_console_page_and_config(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch, None)
+    page = c.get("/")
+    assert page.status_code == 200 and "text/html" in page.headers["content-type"] and "loopthink" in page.text
+    cfg = c.get("/config").json()
+    assert cfg["llm_connected"] is False and cfg["llm_model"] is None and cfg["min_confidence"] == 0.6
+    assert cfg["presets"] == {"0.1": 0.6} and cfg["reference"]["llm_only_ms"] > 0 and cfg["intents"] == len(INTENTS)
+
+
+def test_per_request_threshold_and_prompt_preview(tmp_path, monkeypatch):
+    seen = {}
+    def llm(text, cands):
+        seen["cands"] = cands; return dict(label=OOS, ms=3.0)
+    c = _client(tmp_path, monkeypatch, llm)
+    post = lambda **kw: c.post("/decide", json=kw).json()
+    assert post(text="maybe later")["source"] == "model"                           # 0.7 > validated 0.6
+    a = post(text="maybe later", min_confidence=0.8, top_k=3, explain=True)         # caller asks for more caution
+    assert a["source"] == "llm" and a["answer"] == OOS and len(seen["cands"]) == 3 and len(a["top"]) == 3
+    cands = [t["intent"] for t in a["top"]] + [OOS]
+    assert a["llm_prompt"]["system"] == L.build_shortlist_prompt(True)              # same prompt the LLM was given
+    assert a["llm_prompt"]["user"] == L.shortlist_message("maybe later", cands, ExampleIndex.from_labeled(TRAIN).lookup("maybe later", cands, 2))
+    assert "llm_prompt" not in post(text="remind me at noon", explain=True)         # confident: nothing was sent
+    assert "llm_prompt" not in post(text="maybe later", min_confidence=0.8)         # only on request
+    assert c.post("/decide", json=dict(text="x", min_confidence=1.5)).status_code == 422
