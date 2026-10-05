@@ -1,5 +1,7 @@
 # loopthink
 
+[![CI](https://github.com/preranam05/loopthink/actions/workflows/ci.yml/badge.svg)](https://github.com/preranam05/loopthink/actions/workflows/ci.yml)
+
 **When can a small model make the decision, and when does it need an LLM?**
 
 A 22.8M-parameter classifier answers most queries in about 2 ms and hands the uncertain ones to an LLM
@@ -138,7 +140,7 @@ Tested on a MacBook Pro (Apple silicon, 16 GB). Python 3.11+.
 
 ```bash
 pip install -r requirements.txt transformers
-python -m pytest -q tests/                      # 21 tests
+python -m pytest -q tests/                      # 22 tests
 
 bash scripts/run_seeds.sh                       # MiniLM, 3 seeds × 2 datasets × 2 unknown types (~30 min)
 

@@ -1,0 +1,12 @@
+# What the test suite and the router service need (no GPU, no demo or data-prep extras).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+tokenizers
+transformers
+numpy
+scikit-learn
+certifi
+fastapi
+pydantic>=2
+httpx
+pytest
