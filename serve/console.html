@@ -226,6 +226,7 @@ const SAMPLE = ["set a timer for ten minutes", "what's the weather like in bosto
   "how do you say thank you in spanish", "what's on my calendar tomorrow", "tell me a joke", "how long does it take to boil an egg",
   "what should i cook with eggs and spinach", "turn the volume up", "flip a coin", "what's the capital of australia"];
 let CFG = null, hist = [], busy = false, last = null;
+const MIN_COMPARE = 5, NOTE = document.getElementById('note').textContent;
 
 function kindOf(r) {
   if (r.source === 'model') return 'fast';
@@ -316,16 +317,24 @@ function renderImpact() {
   if (!n) {
     $('pct').textContent = '–'; $('pcts').textContent = 'of requests answered without calling an LLM';
     ['t1', 't2', 'c1', 'c2'].forEach(k => { $('b-' + k).style.width = '0'; $('v-' + k).textContent = '–'; });
+    $('note').textContent = NOTE;
     $('dt').hidden = $('dc').hidden = true; $('rows').innerHTML = '<div class="none">Nothing yet.</div>'; return;
   }
   $('pct').textContent = Math.round(100 * c.fast / n) + '%';
   $('pcts').textContent = `of requests answered without calling an LLM (${c.fast} of ${n})`;
+  if (n < MIN_COMPARE) {                         // a handful of requests is not a fair comparison yet
+    ['t1', 't2', 'c1', 'c2'].forEach(k => { $('b-' + k).style.width = '0'; $('v-' + k).textContent = '–'; });
+    $('dt').hidden = $('dc').hidden = true;
+    $('note').textContent = `The time and cost comparison appears after ${MIN_COMPARE} requests (${MIN_COMPARE - n} to go), or press Play below.`;
+  } else {
+  $('note').textContent = NOTE;
   const e = estimate(), tm = Math.max(e.t1, e.t2), cm = Math.max(e.c1, e.c2);
   $('b-t1').style.width = Math.max(1.5, 100 * e.t1 / tm) + '%'; $('b-t2').style.width = 100 * e.t2 / tm + '%';
   $('b-c1').style.width = Math.max(1.5, 100 * e.c1 / cm) + '%'; $('b-c2').style.width = 100 * e.c2 / cm + '%';
   $('v-t1').textContent = Math.round(e.t1) + ' ms'; $('v-t2').textContent = e.t2 + ' ms';
   $('v-c1').textContent = money(e.c1); $('v-c2').textContent = money(e.c2);
   setDelta($('dt'), e.t1, e.t2); setDelta($('dc'), Math.max(e.c1, 1e-9), e.c2);
+  }
   $('rows').innerHTML = hist.slice(0, 40).map((h, i) => `<div class="row" data-i="${i}"><i style="background:${COLORS[h.kind]}"></i>
     <div class="q">${esc(h.text)}<small>${esc(h.kind === 'oos' ? 'declined: not supported' : h.answer)}${h.kind === 'pending' ? ' · needs LLM' : ''}</small></div>
     <span class="ms">${Math.max(1, Math.round(h.latency_ms))} ms</span></div>`).join('');

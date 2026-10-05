@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/preranam05/loopthink/actions/workflows/ci.yml/badge.svg)](https://github.com/preranam05/loopthink/actions/workflows/ci.yml)
 
+**Live console: [loopthink-router.yellowfield-4b78db58.uaenorth.azurecontainerapps.io](https://loopthink-router.yellowfield-4b78db58.uaenorth.azurecontainerapps.io)** (sleeps when idle; the first load can take up to a minute)
+
 **When can a small model make the decision, and when does it need an LLM?**
 
 A 22.8M-parameter classifier answers most queries in about 2 ms and hands the uncertain ones to an LLM
@@ -128,6 +130,10 @@ failures. By default the LLM sees each shortlisted label with its three most sim
 the best setup measured above (`EXAMPLES=0` sends label names only). A test checks that the served prompt
 is the same one the offline measurement used. The fallback LLM is Ollama by default; `LLM_PROVIDER=openai|groq|openrouter|gemini` switches to a
 hosted model. `Dockerfile.router` builds a container.
+
+Every push to `main` runs the tests, builds the image, starts the container and sends it a request, publishes
+it to GitHub Container Registry, and rolls it out to Azure Container Apps (`.github/workflows/ci.yml`). The
+trained model is a release file that the build downloads and checks against a SHA-256.
 
 The root URL (`/`) is an interactive console: type a request and see which model answered, the route it took,
 the timings and the prompt an escalated request sends. A session panel estimates time and cost against sending
