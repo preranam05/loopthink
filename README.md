@@ -122,8 +122,13 @@ plain-English reason, timings, and which path answered:
 | `model_no_llm` | The caller set `allow_llm: false` to cap cost or latency |
 
 Every request is logged, and `/dashboard` shows escalation rate, out-of-scope rate, latency and LLM
-failures. The fallback LLM is Ollama by default; `LLM_PROVIDER=openai|groq|openrouter|gemini` switches to a
+failures. By default the LLM sees each shortlisted label with its three most similar training examples,
+the best setup measured above (`EXAMPLES=0` sends label names only). A test checks that the served prompt
+is the same one the offline measurement used. The fallback LLM is Ollama by default; `LLM_PROVIDER=openai|groq|openrouter|gemini` switches to a
 hosted model. `Dockerfile.router` builds a container.
+
+`demo/router_app.py` is a small Gradio front end for the same router, and `scripts/push_space.py` publishes
+it as a Hugging Face Space.
 
 ## Reproduce
 
@@ -131,7 +136,7 @@ Tested on a MacBook Pro (Apple silicon, 16 GB). Python 3.11+.
 
 ```bash
 pip install -r requirements.txt transformers
-python -m pytest -q tests/                      # 16 tests
+python -m pytest -q tests/                      # 21 tests
 
 bash scripts/run_seeds.sh                       # MiniLM, 3 seeds × 2 datasets × 2 unknown types (~30 min)
 
@@ -153,6 +158,7 @@ The looped model needs the 200M-token pretraining run first (about 10 hours on t
 loopthink/   router.py  llm.py                      decision logic, LLM fallback
              model.py  pretrain.py  finetune.py  evaluate.py  engine.py   looped transformer
 serve/       router_api.py  (api.py: looped-model service)
+demo/        router_app.py  (app.py: looped-model demo)
 scripts/     encoder_baseline.py  cascade.py  llm_validate.py  report.py
              conformal.py  clm.py  kill_test.py  prepare_hwu64.py  run_seeds.sh
 results/     REPORT.md  CONFORMAL.md  CLM_KILLTEST.md
@@ -162,8 +168,6 @@ tests/       test_router.py  test_core.py
 ## Limits
 
 - Public academic benchmarks, not real user traffic.
-- The served API sends the LLM a top-5 shortlist of label names. The examples prompt is measured offline
-  in `scripts/llm_validate.py --examples 3` and is not yet wired into the API.
 - The share of unknown traffic (5%) is an assumption; REPORT.md shows 2%, 5%, 10% and 18%.
 - LLM comparisons use one classifier seed and 150–300 sampled LLM calls per group, which is why their
   intervals are wide.

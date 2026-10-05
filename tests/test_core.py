@@ -10,7 +10,7 @@ from loopthink.engine import AdaptiveClassifier
 from loopthink.evaluate import adaptive_exit, collect, signals
 from loopthink.model import PRESETS, ModelConfig, build_model
 
-TEXTS = ["book a flight to paris", "what is my balance", "set an alarm for 7", "freeze my card",
+TEXTS = ["book a flight to paris", "what is the weather", "set an alarm for 7", "turn up the volume",
          "play some jazz", "how tall is everest", "remind me to call mom", "is my flight delayed"] * 3
 
 

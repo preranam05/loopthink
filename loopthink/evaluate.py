@@ -180,8 +180,8 @@ def main(argv=None):
         R["per_intent"] = per
         R["slowest_intents"] = sorted(per, key=lambda k: -per[k]["loops"])[:15]
         R["fastest_intents"] = sorted(per, key=lambda k: per[k]["loops"])[:15]
-        pairs = [("book_flight", "flight_status"), ("timer", "alarm"), ("transfer", "balance"),
-                 ("pay_bill", "bill_balance"), ("freeze_account", "report_fraud")]
+        pairs = [("book_flight", "flight_status"), ("timer", "alarm"), ("play_music", "next_song"),
+                 ("calendar", "calendar_update"), ("reminder", "reminder_update")]
         R["confusable_pairs"] = {f"{a}|{b}": dict(loops=[per[a]["loops"], per[b]["loops"]],
                                                    acc=[per[a]["acc"], per[b]["acc"]])
                                  for a, b in pairs if a in per and b in per}

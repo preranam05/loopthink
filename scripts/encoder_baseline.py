@@ -140,7 +140,8 @@ def main(argv=None):
         torch.save(cpu.head.state_dict(), os.path.join(a.out, "head.pt"))
         zv = lg["val"] - lg["val"].max(-1, keepdims=True); pv = np.exp(zv) / np.exp(zv).sum(-1, keepdims=True)
         thr = {str(r): float(np.quantile(-pv.max(-1), 1 - r)) for r in (0.05, 0.10, 0.20)}  # escalate if -msp >= thr
-        json.dump(dict(base_model=a.model, setup=a.setup, data=a.clinc, intents=split.intents, max_len=a.max_len,
+        json.dump([[t, split.intents[y]] for t, y in split.train], open(os.path.join(a.out, "examples.json"), "w"))
+        json.dump(dict(base_model=a.model, setup=a.setup, data=a.clinc, n_heldout=a.n_heldout, intents=split.intents, max_len=a.max_len,
                        signal="msp", thresholds_by_val_rate=thr, test_acc=acc),
                   open(os.path.join(a.out, "router.json"), "w"), indent=2)
     md = (f"# {a.model} on {a.setup}\n\n{n_params/1e6:.1f}M params. In-scope test accuracy **{acc:.3f}**.\n\n"

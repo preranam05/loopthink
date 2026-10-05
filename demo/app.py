@@ -15,7 +15,7 @@ from loopthink.train_utils import get_device
 MODEL_DIR = os.environ.get("MODEL_DIR", os.path.join(os.path.dirname(__file__), "model"))
 clf = AdaptiveClassifier.from_run(MODEL_DIR, get_device())
 EXAMPLES = ["book me a flight to boston on friday", "is my flight to denver on time",
-            "set a timer for ten minutes", "wake me up at 6am", "how do i freeze my card",
+            "set a timer for ten minutes", "wake me up at 6am", "play some jazz in the kitchen",
             "what's the best way to grow tomatoes on a balcony", "who painted the ceiling of the sistine chapel"]
 
 

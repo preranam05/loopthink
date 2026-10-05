@@ -61,6 +61,35 @@ class ExampleIndex:
         for r, (_, y) in enumerate(train_pairs):
             self.rows.setdefault(intents[y], []).append(r)
 
+    @classmethod
+    def from_labeled(cls, pairs):
+        """pairs: [(text, label name)]."""
+        intents = sorted({l for _, l in pairs})
+        ix = {l: i for i, l in enumerate(intents)}
+        return cls([(t, ix[l]) for t, l in pairs], intents)
+
+    @classmethod
+    def from_run(cls, run_dir, root="."):
+        """Training examples for a saved router: <run_dir>/examples.json if present (written by
+        encoder_baseline.py --save_model), otherwise rebuilt from the dataset the run was trained on."""
+        import os
+        p = os.path.join(run_dir, "examples.json")
+        if os.path.exists(p):
+            return cls.from_labeled([tuple(x) for x in json.load(open(p))])
+        from .data import load_clinc, make_split
+        cfg = json.load(open(os.path.join(run_dir, "router.json")))
+        data = cfg.get("data", "data")
+        raw = load_clinc(data if os.path.isabs(data) else os.path.join(root, data))
+        n_held = len({l for _, l in raw["train"]}) - len(cfg["intents"])    # intents hidden when the run was trained
+        split = make_split(raw, cfg["setup"], n_held, 0)
+        if list(split.intents) != list(cfg["intents"]):
+            raise ValueError("dataset intents do not match the saved router")
+        try:   # keep a copy next to the model so the run folder is self-contained (e.g. for Docker)
+            json.dump([[t, split.intents[y]] for t, y in split.train], open(p, "w"))
+        except OSError:
+            pass
+        return cls(split.train, split.intents)
+
     def lookup(self, text, labels, k):
         q = self.vec.transform([text])
         out = {}
@@ -102,14 +131,19 @@ def ask_ollama(host, model, system, text, timeout, fmt="json"):
                 output_tokens=out.get("eval_count"))
 
 
-def shortlist_llm(host, model, timeout=10.0, provider="ollama", api_key=None):
-    """Returns fn(text, candidates) -> dict(label, ms, ...) using the measured shortlist setup."""
-    system = build_shortlist_prompt()
-    ask = make_asker(provider, host, api_key)
+def shortlist_llm(host, model, timeout=10.0, provider="ollama", api_key=None, examples=None, n_examples=3):
+    """Returns fn(text, candidates) -> dict(label, ms, ...) using the measured shortlist setup.
+    examples: an ExampleIndex; when given, each candidate is shown with its n_examples nearest training
+    examples (the "+ examples" setup in results/REPORT.md). A rate-limited call fails at once, so a live
+    request falls back to the classifier instead of waiting."""
+    use_ex = examples is not None and n_examples > 0
+    system = build_shortlist_prompt(use_ex)
+    ask = make_asker(provider, host, api_key, max_wait=0.0)
 
     def call(text, candidates):
         cands = list(candidates) + ([OOS] if OOS not in candidates else [])
-        r = ask(model, system, shortlist_message(text, cands), timeout, cands)
+        ex = examples.lookup(text, cands, n_examples) if use_ex else None
+        r = ask(model, system, shortlist_message(text, cands, ex), timeout, cands)
         if r["label"] not in cands:
             raise ValueError(f"LLM returned invalid label {r['label']!r}")
         return r
@@ -126,9 +160,15 @@ PROVIDERS = {  # base URLs of OpenAI-compatible chat-completions APIs
 KEY_ENV = {"openai": "OPENAI_API_KEY", "groq": "GROQ_API_KEY", "openrouter": "OPENROUTER_API_KEY", "gemini": "GEMINI_API_KEY"}
 
 
-def ask_openai(base_url, api_key, model, system, text, timeout, labels=None, _strict=[True]):
+class RateLimited(RuntimeError):
+    pass
+
+
+def ask_openai(base_url, api_key, model, system, text, timeout, labels=None, max_wait=600.0, _strict=[True]):
     """Chat-completions call constrained to `labels` via a JSON schema (falls back to plain JSON mode
-    for providers that reject strict schemas). Token counts come from the API's own usage field."""
+    for providers that reject strict schemas). Token counts come from the API's own usage field.
+    On HTTP 429 it waits as the API asks, up to max_wait seconds in total per call; a longer wait (for
+    example a daily cap) raises RateLimited instead of hanging."""
     def post(response_format):
         body = dict(model=model, temperature=0, max_tokens=24, response_format=response_format,
                     messages=[dict(role="system", content=system), dict(role="user", content=text)])
@@ -136,7 +176,8 @@ def ask_openai(base_url, api_key, model, system, text, timeout, labels=None, _st
             body.update(max_tokens=1024, reasoning_effort="low")
         req = urllib.request.Request(f"{base_url}/chat/completions", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}", "User-Agent": "loopthink/0.2"})
-        for attempt in range(40):   # free tiers rate-limit: wait as long as the API asks, then retry
+        waited = 0.0
+        for attempt in range(40):   # free tiers rate-limit: wait as the API asks, within max_wait
             try:
                 t_call = time.time()
                 with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
@@ -148,8 +189,12 @@ def ask_openai(base_url, api_key, model, system, text, timeout, labels=None, _st
                     if e.code not in (400, 429):
                         e.msg = f"{e.msg}: {e.read().decode(errors='ignore')[:200]}"
                     raise
-                wait = e.headers.get("retry-after")
-                time.sleep(min(90.0, float(wait) + 1 if wait else 5.0 + 2 * attempt))
+                ra = e.headers.get("retry-after")
+                wait = float(ra) + 1 if ra else 5.0 + 2 * attempt
+                if waited + wait > max_wait:
+                    raise RateLimited(f"rate limited by the provider (asked to wait {wait:.0f}s; "
+                                      "if this is a daily cap, try again after it resets)") from None
+                time.sleep(wait); waited += wait
     t0 = time.time()
     if labels and _strict[0]:
         try:
@@ -172,7 +217,7 @@ def ask_openai(base_url, api_key, model, system, text, timeout, labels=None, _st
     return dict(label=label, raw=raw, ms=ms, prompt_tokens=u.get("prompt_tokens"), output_tokens=u.get("completion_tokens"))
 
 
-def make_asker(provider="ollama", host=None, api_key=None):
+def make_asker(provider="ollama", host=None, api_key=None, max_wait=600.0):
     """fn(model, system, text, timeout, labels) -> dict, for any supported provider."""
     if provider == "ollama":
         host = host or "http://localhost:11434"
@@ -183,4 +228,4 @@ def make_asker(provider="ollama", host=None, api_key=None):
     key = api_key or os.environ.get(KEY_ENV.get(provider, "LLM_API_KEY")) or os.environ.get("LLM_API_KEY")
     if not key:
         raise SystemExit(f"Set {KEY_ENV.get(provider, 'LLM_API_KEY')} for provider {provider}")
-    return lambda model, system, text, timeout, labels=None: ask_openai(base, key, model, system, text, timeout, labels)
+    return lambda model, system, text, timeout, labels=None: ask_openai(base, key, model, system, text, timeout, labels, max_wait)

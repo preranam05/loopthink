@@ -36,7 +36,7 @@ from loopthink.data import load_clinc, make_split  # noqa: E402
 _spec = importlib.util.spec_from_file_location("cascade", os.path.join(os.path.dirname(os.path.abspath(__file__)), "cascade.py"))
 cascade = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(cascade)
 
-from loopthink.llm import OOS, ExampleIndex, make_asker, ask_ollama, build_shortlist_prompt, build_system_prompt, schema, shortlist_message  # noqa: E402
+from loopthink.llm import OOS, ExampleIndex, RateLimited, make_asker, ask_ollama, build_shortlist_prompt, build_system_prompt, schema, shortlist_message  # noqa: E402
 
 
 def main(argv=None):
@@ -132,6 +132,8 @@ def main(argv=None):
                     r = ask(a.model, system, msg, a.timeout, None if a.no_schema else cands)
                 else:
                     r = ask(a.model, system, text, a.timeout, None if a.no_schema else all_intents + [OOS])
+            except RateLimited as e:
+                print(f"  stopping: {e}. Answers so far are saved; re-run the same command later to continue."); break
             except Exception as e:
                 print(f"  call failed ({e}); re-run to retry"); continue
             rec = dict(part=part, i=int(i), text=text, truth=truth, **r, correct=r["label"] == truth)

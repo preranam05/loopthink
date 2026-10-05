@@ -8,7 +8,8 @@ GET  /metrics    rolling metrics (?minutes=60)     GET /dashboard   live HTML vi
 GET  /health     GET /intents
 
 Env: LLM_PROVIDER (ollama|openai|groq|openrouter|gemini, key in OPENAI_API_KEY etc.), ROUTER_DIR, VAL_RATE (0.05|0.1|0.2, default 0.1), OLLAMA_HOST (http://localhost:11434),
-     LLM_MODEL (qwen2.5:7b), LLM_TIMEOUT (10), TOP_K (5), LOG_PATH (logs/requests.jsonl), STORE_TEXT (1)
+     LLM_MODEL (qwen2.5:7b), LLM_TIMEOUT (10), TOP_K (5), LOG_PATH (logs/requests.jsonl), STORE_TEXT (1),
+     EXAMPLES (3): nearest training examples shown to the LLM under each shortlisted label; 0 = label names only
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from loopthink.llm import shortlist_llm
+from loopthink.llm import ExampleIndex, shortlist_llm
 from loopthink.router import RequestLog, Router
 
 CFG = dict(router_dir=os.environ.get("ROUTER_DIR", "runs/minilm_official"),
@@ -28,6 +29,7 @@ CFG = dict(router_dir=os.environ.get("ROUTER_DIR", "runs/minilm_official"),
            llm_model=os.environ.get("LLM_MODEL", "qwen2.5:7b"),
            llm_timeout=float(os.environ.get("LLM_TIMEOUT", "10")),
            top_k=int(os.environ.get("TOP_K", "5")),
+           examples=int(os.environ.get("EXAMPLES", "3")),
            log_path=os.environ.get("LOG_PATH", "logs/requests.jsonl"),
            store_text=os.environ.get("STORE_TEXT", "1") == "1")
 
@@ -40,7 +42,15 @@ _log: RequestLog | None = None
 def router() -> Router:
     global _router
     if _router is None:
-        llm = shortlist_llm(CFG["ollama"], CFG["llm_model"], CFG["llm_timeout"], CFG["provider"]) if CFG["llm_model"] else None
+        ex = None
+        if CFG["llm_model"] and CFG["examples"] > 0:
+            try:
+                ex = ExampleIndex.from_run(CFG["router_dir"])
+            except Exception as e:   # no training data next to the model: serve with label names only
+                print(f"examples prompt disabled ({type(e).__name__}: {e})")
+        CFG["examples_active"] = CFG["examples"] if ex else 0
+        llm = shortlist_llm(CFG["ollama"], CFG["llm_model"], CFG["llm_timeout"], CFG["provider"],
+                            examples=ex, n_examples=CFG["examples"]) if CFG["llm_model"] else None
         _router = Router.from_dir(CFG["router_dir"], CFG["val_rate"], llm, CFG["top_k"])
     return _router
 
@@ -67,7 +77,8 @@ def decide(req: DecideReq):
 @app.get("/health")
 def health():
     r = router()
-    return dict(status="ok", intents=len(r.intents), llm_model=CFG["llm_model"], llm_provider=CFG["provider"], **r.meta)
+    return dict(status="ok", intents=len(r.intents), llm_model=CFG["llm_model"], llm_provider=CFG["provider"],
+                examples_per_label=CFG.get("examples_active", 0), **r.meta)
 
 
 @app.get("/intents")
@@ -107,7 +118,7 @@ button{padding:8px 14px;border:0;border-radius:8px;background:var(--acc);color:#
 <div class="card"><div class="k">LLM failures</div><div class="v" id="fail">–</div></div>
 </div>
 <div class="card"><div class="k">Try a query</div>
-<form id="f"><input id="q" placeholder="e.g. can you freeze my debit card" autocomplete="off"><button>Decide</button></form><pre id="res"></pre></div>
+<form id="f"><input id="q" placeholder="e.g. remind me to call the dentist tomorrow" autocomplete="off"><button>Decide</button></form><pre id="res"></pre></div>
 <div class="grid"><div class="card"><div class="k">Answered by</div><table id="src"></table></div>
 <div class="card"><div class="k">Top answers</div><table id="top"></table></div></div>
 <script>
