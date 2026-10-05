@@ -30,7 +30,7 @@ data only, so no unknown queries are seen before testing.
 |---|---|---|---|---|---|---|
 | CLINC150, far out-of-scope · qwen2.5 7B | 91.1% | **93.6%** [92.9–94.4] | 78.7% [71.8–85.0] | 14.7% | 71 / 455 ms | $0.004 / $0.099 |
 | CLINC150, far out-of-scope · qwen2.5 7B **+ examples** | 91.1% | **95.2%** [94.6–95.9] | 78.7% [71.8–85.0] | 14.7% | 113 / 455 ms | $0.012 / $0.099 |
-| HWU64, far out-of-scope · qwen2.5 7B | 87.0% | **87.9%** [86.2–89.5] | 72.1% [65.1–79.0] | 14.1% | 71 / 465 ms | $0.004 / $0.062 |
+| HWU64, far out-of-scope · qwen2.5 7B | 87.0% | **87.9%** [86.2–89.4] | 72.1% [65.2–78.8] | 14.1% | 71 / 465 ms | $0.004 / $0.062 |
 | HWU64, held-out intents · qwen2.5 7B | 87.5% | **88.5%** [86.8–90.4] | 81.5% [75.8–87.1] | 13.5% | 66 / 449 ms | $0.008 / $0.062 |
 | HWU64, held-out intents · qwen2.5 7B **+ examples** | 87.5% | **89.8%** [88.0–91.6] | 81.5% [75.8–87.1] | 13.5% | 98 / 449 ms | $0.009 / $0.062 |
 | HWU64, held-out intents · gpt-oss 120B | 87.5% | **89.7%** [87.8–91.4] | 84.6% [78.6–89.9] | 13.5% | 109 / 771 ms | $0.018 / $0.132 |
@@ -55,7 +55,8 @@ What these numbers do and do not show:
   output tokens). The local LLM itself is free to run.
 
 Full tables, seed variance and the sensitivity to unknown-traffic share are in
-[results/REPORT.md](results/REPORT.md).
+[results/REPORT.md](results/REPORT.md). Intervals come from bootstrap resampling, so re-running
+`scripts/report.py` can move an interval endpoint by about 0.1.
 
 ## Six ideas, two survivors
 
@@ -81,8 +82,8 @@ Mean ± std over 3 seeds, with 95% bootstrap intervals pooled over seeds and tes
 |---|---|---|---|---|
 | MiniLM-L6 (22.8M) | CLINC150 | far out-of-scope | 95.9 ± 0.1% [95.3–96.5] | 0.973 ± 0.002 |
 | MiniLM-L6 (22.8M) | CLINC150 | held-out intents | 96.6 ± 0.1% [96.0–97.1] | 0.923 ± 0.005 |
-| MiniLM-L6 (22.8M) | HWU64 | far out-of-scope | 91.6 ± 0.2% [89.9–93.2] | 0.895 ± 0.002 |
-| MiniLM-L6 (22.8M) | HWU64 | held-out intents | 92.1 ± 0.1% [90.1–94.0] | 0.879 ± 0.007 |
+| MiniLM-L6 (22.8M) | HWU64 | far out-of-scope | 91.6 ± 0.2% [89.9–93.3] | 0.895 ± 0.002 |
+| MiniLM-L6 (22.8M) | HWU64 | held-out intents | 92.1 ± 0.1% [90.1–93.9] | 0.879 ± 0.007 |
 | Looped transformer (28.8M, trained from scratch) | CLINC150 | far out-of-scope | 93.8% [93.1–94.5] | 0.947 |
 | Looped transformer (28.8M, trained from scratch) | CLINC150 | held-out intents | 94.5% [93.8–95.2] | 0.892 |
 
@@ -174,3 +175,7 @@ tests/       test_router.py  test_core.py
 
 - CLINC150: Larson et al., *An Evaluation Dataset for Intent Classification and Out-of-Scope Prediction*, EMNLP 2019.
 - HWU64: Liu et al., *Benchmarking Natural Language Understanding Services for Building Conversational Agents*, 2019.
+
+## Licence
+
+Code: [MIT](LICENSE). The datasets keep their own licences.
