@@ -1,16 +1,29 @@
-# Decision router: MiniLM classifier + LLM shortlist fallback (Ollama by default).
-#   python scripts/encoder_baseline.py --setup official --out runs/minilm_clinc_official_s0 --save_model
+# Decision router: MiniLM classifier + LLM shortlist fallback, with the console at /.
 #   docker build -f Dockerfile.router -t loopthink-router .
+#   docker run -p 8000:8000 -e LLM_MODEL= loopthink-router            # small model only
 #   docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 loopthink-router
 #   open http://localhost:8000
+#
+# The trained model is not in the repository. The build downloads the released archive and verifies its
+# checksum. To ship a new model: train it (scripts/encoder_baseline.py --save_model), pack router.json,
+# head.pt, examples.json and encoder/ into a .tar.gz, publish it as a release file, and update the two ARGs.
 FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir transformers numpy scikit-learn certifi fastapi "uvicorn[standard]" pydantic
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install transformers numpy scikit-learn certifi fastapi "uvicorn[standard]" pydantic
+
+ARG MODEL_URL=https://github.com/preranam05/loopthink/releases/download/model-v1/router-model.tar.gz
+ARG MODEL_SHA256=0e6bc3de62a34f978f434d3fcf3e3c1d1f7ccfa2fddde72cb34d586c99555014
+COPY scripts/fetch_model.py /tmp/fetch_model.py
+RUN python /tmp/fetch_model.py "$MODEL_URL" "$MODEL_SHA256" /app/model
+
 COPY loopthink/__init__.py loopthink/llm.py loopthink/router.py loopthink/
 COPY serve/router_api.py serve/console.html serve/
-COPY runs/minilm_clinc_official_s0/router.json runs/minilm_clinc_official_s0/head.pt runs/minilm_clinc_official_s0/examples.json model/
-COPY runs/minilm_clinc_official_s0/encoder/ model/encoder/
-ENV ROUTER_DIR=/app/model VAL_RATE=0.1 LLM_MODEL=qwen2.5:7b EXAMPLES=3 LOG_PATH=/app/logs/requests.jsonl
+
+RUN useradd --create-home --uid 1000 app && chown -R app /app
+USER app
+ENV ROUTER_DIR=/app/model VAL_RATE=0.1 EXAMPLES=3 LLM_MODEL=qwen2.5:7b LOG_PATH=/tmp/requests.jsonl \
+    HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 EXPOSE 8000
 CMD ["uvicorn", "serve.router_api:app", "--host", "0.0.0.0", "--port", "8000"]

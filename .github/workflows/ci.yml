@@ -4,13 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/preranam05/loopthink-router
+  AZURE_APP: loopthink-router
+  AZURE_GROUP: loopthink-rg
 
 jobs:
   test:
@@ -29,3 +35,67 @@ jobs:
         run: python -m compileall -q loopthink scripts serve tests demo
       - name: Tests
         run: python -m pytest -q tests/
+
+  # Build the service image, prove the container answers a request, then publish it.
+  image:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -f Dockerfile.router -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+      - name: Smoke test the container
+        run: |
+          docker run -d --name router -p 8000:8000 -e LLM_MODEL= "$IMAGE:${{ github.sha }}"
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fs localhost:8000/health > /tmp/health.json; then ok=1; break; fi
+            sleep 3
+          done
+          if [ "$ok" != 1 ]; then echo "service did not become healthy"; docker logs router; exit 1; fi
+          cat /tmp/health.json; echo
+          curl -fs -X POST localhost:8000/decide -H 'content-type: application/json' \
+            -d '{"text": "set a timer for ten minutes"}' | tee /tmp/decide.json; echo
+          grep -q '"answer":"timer"' /tmp/decide.json
+          grep -q '"source":"model"' /tmp/decide.json
+          curl -fs localhost:8000/ | grep -q loopthink
+          curl -fs localhost:8000/config | grep -q '"llm_connected":false'
+      - name: Container logs
+        if: always()
+        run: docker logs router 2>&1 | tail -40 || true
+      - name: Publish to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+  # Roll the new image out to Azure Container Apps. Runs only once the repository variable
+  # AZURE_DEPLOY is set to "true" and the AZURE_CREDENTIALS secret exists.
+  deploy:
+    needs: image
+    if: vars.AZURE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Deploy
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt
+          fqdn=$(az containerapp update --name "$AZURE_APP" --resource-group "$AZURE_GROUP" \
+            --image "$IMAGE:${{ github.sha }}" --query properties.configuration.ingress.fqdn -o tsv)
+          echo "URL=https://$fqdn" >> "$GITHUB_ENV"
+          echo "Deployed to https://$fqdn" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check the live service
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fs "$URL/health"; then echo; exit 0; fi
+            sleep 5
+          done
+          echo "live service did not answer /health"; exit 1
