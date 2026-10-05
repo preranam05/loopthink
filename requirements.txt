@@ -1,0 +1,14 @@
+torch>=2.2
+tokenizers>=0.15
+numpy
+transformers>=4.40   # MiniLM router model
+certifi              # HTTPS certificates on macOS
+scikit-learn
+matplotlib
+fastapi
+uvicorn[standard]
+pydantic>=2
+datasets>=2.18        # pretraining data prep only
+huggingface_hub       # release script only
+gradio>=4             # demo only
+pytest

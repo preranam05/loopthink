@@ -1,0 +1,15 @@
+# Decision router: MiniLM classifier + Ollama shortlist fallback.
+#   python scripts/encoder_baseline.py --setup official --out runs/minilm_official --save_model
+#   docker build -f Dockerfile.router -t loopthink-router .
+#   docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 loopthink-router
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir transformers numpy fastapi "uvicorn[standard]" pydantic
+COPY loopthink/__init__.py loopthink/llm.py loopthink/router.py loopthink/
+COPY serve/router_api.py serve/
+COPY runs/minilm_official/router.json runs/minilm_official/head.pt model/
+COPY runs/minilm_official/encoder/ model/encoder/
+ENV ROUTER_DIR=/app/model VAL_RATE=0.1 LLM_MODEL=qwen2.5:7b LOG_PATH=/app/logs/requests.jsonl
+EXPOSE 8000
+CMD ["uvicorn", "serve.router_api:app", "--host", "0.0.0.0", "--port", "8000"]
