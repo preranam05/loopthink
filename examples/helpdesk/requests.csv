@@ -1,0 +1,201 @@
+text,intent
+vpn says authentication failed,vpn_issue
+how do i change my password,reset_password
+can't access shared drives while working from home,vpn_issue
+who approves entry to the restricted folder,access_request
+my laptop is overheating and shutting down,hardware_fault
+wifi keeps disconnecting at my desk,wifi_issue
+my laptop connects but says no internet,wifi_issue
+can you give me access to the code repository,access_request
+forgot the pin for my work phone,reset_password
+upgrade my office suite to the latest release,request_software
+connection is fine in the morning and dies after lunch,wifi_issue
+docking station is not detecting my screens,hardware_fault
+can't remember my email password,reset_password
+please deploy the accounting add-in to my spreadsheet program,request_software
+my laptop screen is flickering,hardware_fault
+locked out of my account after too many attempts,reset_password
+my second monitor has a line of dead pixels,hardware_fault
+my laptop doesn't see the office network,wifi_issue
+remote access is not working,vpn_issue
+first day checklist for an incoming engineer,new_starter
+pages take forever to load in the boardroom,wifi_issue
+vpn won't connect from home,vpn_issue
+my print jobs are stuck in the queue,printer_issue
+my password expired and i can't log in,reset_password
+need help setting up the vpn on my new laptop,vpn_issue
+i need a virtual machine tool for testing,request_software
+connected to vpn but nothing loads,vpn_issue
+there's no signal at all in the basement,wifi_issue
+can you get things ready for a summer intern,new_starter
+need read access to the archive,access_request
+my phone won't join the staff network,wifi_issue
+can you create a login for someone joining tomorrow,new_starter
+the printer is out of toner,printer_issue
+a new team member needs all the standard accounts,new_starter
+"a graduate joins us on the first, what do you need from me",new_starter
+printouts are coming out blank,printer_issue
+onboarding request for a contractor starting next week,new_starter
+a new director starts next month and needs everything ready,new_starter
+need the latest java runtime,request_software
+vpn works on my phone but not on the laptop,vpn_issue
+working from a hotel and the secure tunnel fails,vpn_issue
+please prepare equipment for our intern,new_starter
+i forgot my password,reset_password
+my badge doesn't release jobs at the printer,printer_issue
+the vpn app asks for a server address i don't have,vpn_issue
+the installer asks for an administrator password,request_software
+one of my usb ports is dead,hardware_fault
+please add me to the marketing mailing list,access_request
+the wireless keeps asking for a certificate,wifi_issue
+network connection drops during calls,wifi_issue
+wireless is unusable in the new wing,wifi_issue
+i can read the document but not comment on it,access_request
+internet is very slow on the third floor,wifi_issue
+please onboard two people joining the sales team,new_starter
+"can't open the project drive, permission denied",access_request
+the trackpad is not responding,hardware_fault
+we need a workstation ready for a new analyst,new_starter
+can the team get the project planning software,request_software
+i need a newer version of excel,request_software
+the touchscreen registers taps in the wrong place,hardware_fault
+the report says i am not authorised to view it,access_request
+my headset microphone has stopped picking up sound,hardware_fault
+i need to be an approver in the purchasing tool,access_request
+the vpn certificate has expired,vpn_issue
+can you install python on my machine,request_software
+the laptop speakers crackle,hardware_fault
+add me to the engineering group,access_request
+i need a new password for the portal,reset_password
+the office wifi is down,wifi_issue
+add a browser extension that is blocked by policy,request_software
+i need photoshop installed,request_software
+we have a new joiner starting monday who needs a laptop,new_starter
+the label printer is printing off centre,printer_issue
+the laptop fan is making a loud noise,hardware_fault
+can't reach the internal site over vpn,vpn_issue
+the copier shows an error code,printer_issue
+my machine beeps three times and won't boot,hardware_fault
+our temp starts tomorrow with nothing arranged,new_starter
+streaming the all hands meeting keeps buffering,wifi_issue
+is the vpn down for everyone,vpn_issue
+please install the database client,request_software
+need to reset my login password,reset_password
+no internet in meeting room b,wifi_issue
+the secure connection drops when my laptop sleeps,vpn_issue
+our whole row lost connectivity,wifi_issue
+the printer on floor two is jammed,printer_issue
+the ticketing tool shows me as a guest,access_request
+a consultant joins on thursday and needs a pass,new_starter
+the remote desktop gateway is unreachable,vpn_issue
+my account is locked,reset_password
+visitors can't get onto the guest network,wifi_issue
+arrange a phone and laptop for a new manager,new_starter
+the mouse cursor jumps around on its own,hardware_fault
+i'd like the note taking app on my work computer,request_software
+i moved teams and still can't see their files,access_request
+give my manager owner rights on our channel,access_request
+the system says my password is wrong,reset_password
+can i get a license for the design suite,request_software
+extend my access to the client site until december,access_request
+the printer prints everything twice,printer_issue
+someone is transferring from the other office and needs a desk setup,new_starter
+my vpn profile disappeared after the update,vpn_issue
+several keys are stuck after a coffee spill,hardware_fault
+i need access to the shared finance folder,access_request
+vpn error 809 when i try to connect,vpn_issue
+guest wifi password is not working,wifi_issue
+can a contractor get temporary rights to the test environment,access_request
+can you push the translation app to my laptop,request_software
+i'd like a second seat for the prototyping tool,request_software
+desk phone has no dial tone,hardware_fault
+the ethernet port in the wall is dead,wifi_issue
+my webcam shows a black screen,hardware_fault
+password reset link never arrived,reset_password
+please schedule an induction on our systems for a newcomer,new_starter
+scanning to email is not working,printer_issue
+sign in fails even though the password is correct,reset_password
+tunnel connects but internal tools say no route,vpn_issue
+laptop is very slow and the disk light never stops,hardware_fault
+need to reset my authenticator app,reset_password
+please add the pdf editor to my laptop,request_software
+is the mind mapping application approved for use,request_software
+i need edit rights on the team spreadsheet,access_request
+starter kit needed for a new hire,new_starter
+laptop won't turn on,hardware_fault
+please grant me access to the booking system,access_request
+let me see the shared calendar for the design team,access_request
+three apprentices arrive in september,new_starter
+there is a crack across my display,hardware_fault
+i can't print from my laptop,printer_issue
+can't find the colour printer in the list,printer_issue
+how do i recover my account,reset_password
+"my trial of the screenshot tool ran out, can we buy it",request_software
+requesting access to the hr portal,access_request
+we need the statistics package on the lab computers,request_software
+the keyboard has stopped working,hardware_fault
+the hinge on my laptop is broken,hardware_fault
+the network cable at my desk gives no connection,wifi_issue
+the access point on our floor has a red light,wifi_issue
+monitor shows no signal,hardware_fault
+can't get online in the building,wifi_issue
+need help connecting to the new printer,printer_issue
+printer says it is offline,printer_issue
+requesting a license for the diagramming tool,request_software
+add our new lead as an admin of the workspace,access_request
+set up an account for a new employee,new_starter
+the password i set yesterday no longer works,reset_password
+double sided printing is not working,printer_issue
+the person who joined last week still has no computer,new_starter
+the power button does nothing,hardware_fault
+can't get onto the company network from abroad,vpn_issue
+i don't have permission to view the dashboard,access_request
+scans arrive as empty attachments,printer_issue
+the vpn keeps dropping every few minutes,vpn_issue
+remote login to the office machine times out,vpn_issue
+the plotter stopped halfway through a drawing,printer_issue
+my battery dies in twenty minutes,hardware_fault
+i sent a document and nothing came out,printer_issue
+i get a timeout when connecting to the vpn,vpn_issue
+the copier won't staple,printer_issue
+can't connect to the office network remotely,vpn_issue
+new colleague has no email address yet,new_starter
+requesting the screen recording program,request_software
+vpn is extremely slow today,vpn_issue
+paper tray two is not being detected,printer_issue
+reset the password on my laptop login,reset_password
+install the video conferencing app for me,request_software
+"we hired a designer, please get them set up",new_starter
+my new assistant needs a mailbox and a phone,new_starter
+need my badge to open the server room,access_request
+the copier is asking for a maintenance kit,printer_issue
+new hire needs email and a badge,new_starter
+who orders the equipment for a new recruit,new_starter
+my access to the wiki was removed,access_request
+request to join the security distribution list,access_request
+need admin rights to install a plugin,request_software
+vpn client crashes on startup,vpn_issue
+it prints in black and white even when i choose colour,printer_issue
+i typed the wrong password three times and now i'm blocked,reset_password
+wifi asks me to sign in again and again,wifi_issue
+the scanner produces crooked images,printer_issue
+single sign on won't accept my details,reset_password
+request for a code editor installation,request_software
+can you send me a temporary password,reset_password
+the wireless signal is weak near the kitchen,wifi_issue
+which wifi network should i use,wifi_issue
+i lost the device i use for login codes,reset_password
+please unlock my account,reset_password
+how do i get access to the analytics software,request_software
+how do i add the office printer,printer_issue
+two factor code is not being accepted,reset_password
+the print driver fails to install,printer_issue
+computer shuts down at random,hardware_fault
+change my password before it expires,reset_password
+pages come out with black streaks,printer_issue
+my login expired over the holidays,reset_password
+it keeps rejecting my credentials,reset_password
+please remove my access to the old project,access_request
+i can't connect to the wireless network,wifi_issue
+vpn disconnects whenever i join a video call,vpn_issue
+the charger is not charging the laptop,hardware_fault

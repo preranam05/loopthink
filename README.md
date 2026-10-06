@@ -140,13 +140,26 @@ the timings and the prompt an escalated request sends. A session panel estimates
 every request to an LLM, and a slider changes the confidence threshold per request. `scripts/push_space.py`
 publishes the same service as a Hugging Face Space.
 
+## Use it on your own intents
+
+```bash
+python scripts/train_custom.py --data my_requests.csv --unknown my_unknown.csv --out runs/mine
+ROUTER_DIR=runs/mine LLM_MODEL= uvicorn serve.router_api:app --port 8000
+```
+
+Give it a CSV of example requests and their intents. It checks the data, fine-tunes the classifier, writes a
+report on held-out requests (accuracy with an interval, what each threshold would send to the LLM, the
+weakest intents) and serves the same console on your labels. A made-up IT-helpdesk dataset is included to try
+it: `examples/helpdesk/`. Full walkthrough, including packaging and deployment:
+[docs/CUSTOM_DATA.md](docs/CUSTOM_DATA.md).
+
 ## Reproduce
 
 Tested on a MacBook Pro (Apple silicon, 16 GB). Python 3.11+.
 
 ```bash
 pip install -r requirements.txt transformers
-python -m pytest -q tests/                      # 22 tests
+python -m pytest -q tests/                      # 29 tests
 
 bash scripts/run_seeds.sh                       # MiniLM, 3 seeds × 2 datasets × 2 unknown types (~30 min)
 
@@ -170,6 +183,7 @@ loopthink/   router.py  llm.py                      decision logic, LLM fallback
 serve/       router_api.py  console.html  (api.py: looped-model service)
 demo/        app.py  (looped-model demo)
 scripts/     encoder_baseline.py  cascade.py  llm_validate.py  report.py
+             train_custom.py  package_model.py  fetch_model.py
              conformal.py  clm.py  kill_test.py  prepare_hwu64.py  run_seeds.sh
 results/     REPORT.md  CONFORMAL.md  CLM_KILLTEST.md
 tests/       test_router.py  test_core.py

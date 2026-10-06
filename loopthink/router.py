@@ -54,7 +54,7 @@ class Router:
     def __init__(self, predict_probs, intents, threshold, llm=None, top_k=5, meta=None):
         self.predict_probs, self.intents, self.threshold = predict_probs, intents, threshold
         self.llm, self.top_k, self.meta = llm, top_k, meta or {}
-        self.presets = {}
+        self.presets, self.info = {}, {}
 
     @classmethod
     def from_dir(cls, run_dir, val_rate=0.10, llm=None, top_k=5, device="cpu"):
@@ -80,6 +80,8 @@ class Router:
         r = cls(predict_probs, cfg["intents"], thr, llm, top_k,
                 meta=dict(base_model=cfg["base_model"], setup=cfg["setup"], val_rate=val_rate, threshold=thr))
         r.presets = {k: round(-float(v), 3) for k, v in cfg["thresholds_by_val_rate"].items()}   # rate -> min confidence
+        r.info = dict(custom=bool(cfg.get("custom")), dataset=cfg.get("dataset"), ui=cfg.get("ui"),
+                      test_accuracy=(cfg.get("report") or {}).get("test_accuracy", cfg.get("test_acc")))
         return r
 
     def decide(self, text, allow_llm=True, min_confidence=None, top_k=None):

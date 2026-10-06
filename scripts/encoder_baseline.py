@@ -72,6 +72,9 @@ def main(argv=None):
     ap.add_argument("--max_len", type=int, default=48)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--save_model", action="store_true")
+    ap.add_argument("--select", default="acc", choices=["acc", "loss"],
+                    help="keep the epoch with the best validation accuracy (benchmark runs) or the lowest validation "
+                         "loss (steadier on small datasets, where accuracy on a few dozen rows is noisy)")
     a = ap.parse_args(argv)
     torch.manual_seed(a.seed); np.random.seed(a.seed)
     device = get_device()
@@ -89,7 +92,7 @@ def main(argv=None):
     steps = a.epochs * ((len(tr_x) + a.bs - 1) // a.bs)
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=0.01)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps, pct_start=0.1)
-    best, best_state, log = -1.0, None, []
+    best, best_score, best_state, log = -1.0, None, None, []
     for ep in range(1, a.epochs + 1):
         model.train(); t0 = time.time(); perm = np.random.permutation(len(tr_x)); tot = 0.0
         for s in range(0, len(perm), a.bs):
@@ -100,11 +103,17 @@ def main(argv=None):
             opt.zero_grad(set_to_none=True); loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step(); sched.step()
             tot += loss.item() * len(idx)
-        acc = float((logits_for(model, tok, va_x, 256, a.max_len, device).argmax(-1) == y_val).mean())
-        rec = dict(epoch=ep, train_loss=round(tot / len(tr_x), 4), val_acc=round(acc, 4), minutes=round((time.time() - t0) / 60, 2))
+        zv = logits_for(model, tok, va_x, 256, a.max_len, device)
+        acc = float((zv.argmax(-1) == y_val).mean())
+        zs = zv - zv.max(-1, keepdims=True)
+        vloss = float(-(zs - np.log(np.exp(zs).sum(-1, keepdims=True)))[np.arange(len(y_val)), y_val].mean())
+        rec = dict(epoch=ep, train_loss=round(tot / len(tr_x), 4), val_acc=round(acc, 4), val_loss=round(vloss, 4),
+                   minutes=round((time.time() - t0) / 60, 2))
         print(json.dumps(rec)); log.append(rec)
-        if acc > best:
-            best, best_state = acc, {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        score = acc if a.select == "acc" else -vloss
+        if best_state is None or score > best_score:
+            best, best_score = acc, score
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
     model.load_state_dict(best_state)
 
     parts = {"val": va_x, "test": [t for t, _ in split.test], "unk_test": split.unknown_test}
@@ -117,7 +126,8 @@ def main(argv=None):
         return dict(msp=-p.max(-1), energy=-(np.log(np.exp(z).sum(-1)) + x.max(-1)))
     si, so = scores(lg["test"]), scores(lg["unk_test"])
     y = np.r_[np.zeros(len(y_test)), np.ones(len(split.unknown_test))]
-    ood = {k: dict(auroc=float(roc_auc_score(y, np.r_[si[k], so[k]])), fpr95=fpr_at_95(y, np.r_[si[k], so[k]])) for k in si}
+    ood = ({k: dict(auroc=float(roc_auc_score(y, np.r_[si[k], so[k]])), fpr95=fpr_at_95(y, np.r_[si[k], so[k]])) for k in si}
+           if len(split.unknown_test) else {})   # custom data may come without unknown requests
 
     # single-query CPU latency (batch 1), the number that matters for serving
     cpu = model.to("cpu").eval(); q = parts["test"][:200]; ms = []

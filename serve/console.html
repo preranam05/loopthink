@@ -218,14 +218,14 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pretty = l => { const s = l.replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const EXAMPLES = [["set a timer for ten minutes"], ["is my flight to denver on time"], ["remind me to call the dentist tomorrow"],
+let EXAMPLES = [["set a timer for ten minutes"], ["is my flight to denver on time"], ["remind me to call the dentist tomorrow"],
   ["play some jazz in the kitchen"], ["what should i cook with eggs and spinach"], ["who painted the sistine chapel", 1], ["how do i grow tomatoes on a balcony", 1]];
-const SAMPLE = ["set a timer for ten minutes", "what's the weather like in boston", "wake me up at 6am", "book me a flight to chicago on friday",
+let SAMPLE = ["set a timer for ten minutes", "what's the weather like in boston", "wake me up at 6am", "book me a flight to chicago on friday",
   "play some jazz", "how many calories are in an apple", "who painted the sistine chapel", "remind me to call the dentist tomorrow",
   "what time is it in tokyo", "add milk to my shopping list", "is my flight to denver on time", "translate good morning into french",
   "how do you say thank you in spanish", "what's on my calendar tomorrow", "tell me a joke", "how long does it take to boil an egg",
   "what should i cook with eggs and spinach", "turn the volume up", "flip a coin", "what's the capital of australia"];
-let CFG = null, hist = [], busy = false, last = null;
+let CFG = null, hist = [], busy = false, last = null, PLAY = '';
 const MIN_COMPARE = 5, NOTE = document.getElementById('note').textContent;
 
 function kindOf(r) {
@@ -361,7 +361,7 @@ async function play() {
   if (busy) return; busy = true; $('play').disabled = $('run').disabled = true;
   try { for (let i = 0; i < SAMPLE.length; i++) { $('play').textContent = `Running ${i + 1} of ${SAMPLE.length}…`; $('q').value = SAMPLE[i]; await decide(SAMPLE[i], true); await sleep(140); } }
   catch (e) { $('result').innerHTML = `<div class="empty"><div><b>Could not reach the router.</b><br>${esc(e.message)}</div></div>`; }
-  $('play').innerHTML = '▶&nbsp; Play 20 sample requests'; busy = false; $('play').disabled = $('run').disabled = false;
+  $('play').innerHTML = PLAY; busy = false; $('play').disabled = $('run').disabled = false;
 }
 function setThr(v) {
   $('thr').value = v; $('thrv').textContent = parseFloat(v).toFixed(3);
@@ -377,7 +377,6 @@ function exportCsv() {
 }
 
 async function init() {
-  $('chips').innerHTML = EXAMPLES.map(([t, odd]) => `<button type="button" class="chip${odd ? ' odd' : ''}">${esc(t)}</button>`).join('');
   $('chips').onclick = e => { if (e.target.classList.contains('chip')) run(e.target.textContent); };
   $('form').onsubmit = e => { e.preventDefault(); run($('q').value); };
   $('play').onclick = play; $('csv').onclick = exportCsv;
@@ -388,6 +387,12 @@ async function init() {
   try {
     CFG = await (await fetch('config')).json();
   } catch (e) { $('s-llm').textContent = 'Router offline'; return; }
+  if (CFG.ui && CFG.ui.examples && CFG.ui.examples.length) {      // a model trained on someone's own intents brings its own examples
+    EXAMPLES = CFG.ui.examples; SAMPLE = (CFG.ui.sample && CFG.ui.sample.length) ? CFG.ui.sample : EXAMPLES.map(e => e[0]);
+    $('q').placeholder = 'Type a request, e.g. ' + EXAMPLES[0][0];
+  }
+  PLAY = `▶&nbsp; Play ${SAMPLE.length} sample requests`; $('play').innerHTML = PLAY;
+  $('chips').innerHTML = EXAMPLES.map(([t, odd]) => `<button type="button" class="chip${odd ? ' odd' : ''}">${esc(t)}</button>`).join('');
   $('d-llm').classList.toggle('on', true);
   $('s-llm').textContent = CFG.llm_connected ? `Live · LLM fallback ${CFG.llm_model}` : 'Live · small model only';
   const P = Object.entries(CFG.presets || {}).map(([k, v]) => [parseFloat(k), v]).sort((a, b) => a[0] - b[0]);
@@ -396,8 +401,12 @@ async function init() {
   $('presets').onclick = e => { if (e.target.dataset.v) { setThr(parseFloat(e.target.dataset.v)); if (last && !busy) run(last.text); } };
   setThr(Math.min(0.999, Math.max(0.5, CFG.min_confidence)));
   const R = CFG.reference;
-  $('foot').innerHTML = `<span>Benchmark (CLINC150, 5% unknown traffic): <b>${R.accuracy}%</b> accuracy with the router, <b>${R.llm_only_accuracy}%</b> for a 7B LLM alone</span>
-    <span>${CFG.intents} intents · ${esc(String(CFG.base_model || '').split('/').pop())}</span>
+  const model = esc(String(CFG.base_model || '').split('/').pop());
+  $('foot').innerHTML = CFG.custom
+    ? `<span>Custom intents: <b>${esc(CFG.dataset || 'your data')}</b> · ${CFG.intents} intents · ${model}</span>` +
+      (CFG.test_accuracy != null ? `<span>Small model alone: <b>${(100 * CFG.test_accuracy).toFixed(1)}%</b> on held-out examples</span>` : '')
+    : `<span>Benchmark (CLINC150, 5% unknown traffic): <b>${R.accuracy}%</b> accuracy with the router, <b>${R.llm_only_accuracy}%</b> for a 7B LLM alone</span>
+    <span>${CFG.intents} intents · ${model}</span>
     <a href="https://github.com/preranam05/loopthink/blob/main/results/REPORT.md" target="_blank" rel="noopener">Full measurements</a>`;
   renderImpact(); $('q').focus();
 }

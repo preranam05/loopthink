@@ -204,3 +204,12 @@ def test_per_request_threshold_and_prompt_preview(tmp_path, monkeypatch):
     assert "llm_prompt" not in post(text="remind me at noon", explain=True)         # confident: nothing was sent
     assert "llm_prompt" not in post(text="maybe later", min_confidence=0.8)         # only on request
     assert c.post("/decide", json=dict(text="x", min_confidence=1.5)).status_code == 422
+
+
+def test_custom_model_brings_its_own_console_examples(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch, None)
+    import serve.router_api as api
+    assert c.get("/config").json().get("custom") in (None, False)
+    api._router.info = dict(custom=True, dataset="helpdesk", test_accuracy=0.9, ui=dict(examples=[["vpn is down", 0]], sample=["vpn is down"]))
+    cfg = c.get("/config").json()
+    assert cfg["custom"] is True and cfg["dataset"] == "helpdesk" and cfg["ui"]["examples"] == [["vpn is down", 0]]

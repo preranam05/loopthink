@@ -103,7 +103,7 @@ def config():
     r = router()
     return dict(intents=len(r.intents), base_model=r.meta.get("base_model"), llm_connected=r.llm is not None,
                 llm_model=CFG["llm_model"] if r.llm is not None else None, min_confidence=round(-r.threshold, 3),
-                presets=r.presets, top_k=r.top_k, examples_per_label=CFG.get("examples_active", 0), reference=REFERENCE)
+                presets=r.presets, top_k=r.top_k, **r.info, examples_per_label=CFG.get("examples_active", 0), reference=REFERENCE)
 
 
 @app.get("/", include_in_schema=False)
